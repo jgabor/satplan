@@ -1,6 +1,7 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  staged: { "*.{ts,json,jsonc,css,html,md}": "vp check --fix" },
   fmt: { ignorePatterns: ["src/data/catalog.json", "data/raw/**", "package-lock.json"] },
   lint: {
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],

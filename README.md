@@ -47,14 +47,25 @@ How the catalog is built:
 - Nitrogen uses one pure well satellite (120 m³/min each). The pressurizer is not counted.
 - The default target for each item is one building at 100% in the top-ranked chain. Changing the ranking metric does not change the default target.
 
+## Hooks
+
+`npm install` runs `vp config` (the `prepare` script), which points `core.hooksPath` at `.vite-hooks/_`. The committed `.vite-hooks/pre-commit` runs `vp staged`, which runs `vp check --fix` on staged files (see `staged` in `vite.config.ts`).
+
 ## Deploy
 
-The site is plain static files, served by Cloudflare Workers static assets (see `wrangler.jsonc`). R2 is not used.
+The site is plain static files, served by Cloudflare Workers static assets (see `wrangler.jsonc`) at https://satplan.jgabor.se. R2 is not used.
+
+Every push to `main` runs `.github/workflows/ci.yml`: `vp check`, `vp test`, `vp build`, then `wrangler deploy`. Pull requests run the checks only. The workflow needs two repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`: permissions Account › Workers Scripts: Edit, and Zone `jgabor.se` › Workers Routes: Edit and DNS: Edit.
+- `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account that holds the `jgabor.se` zone.
+
+The route in `wrangler.jsonc` attaches `satplan.jgabor.se` as a custom domain. Wrangler creates the DNS record and certificate on the first deploy.
+
+To deploy by hand:
 
 ```sh
 vp run deploy   # vp check, vp test, vp build, then wrangler deploy
 ```
 
-Wrangler runs through `vp dlx` at the version pinned in the `deploy` task, so it is not a project dependency.
-
-The route in `wrangler.jsonc` attaches `satplan.mutker.com` as a custom domain. The `mutker.com` zone must be on the same Cloudflare account.
+Wrangler runs through `vp dlx` at a pinned version (in the `deploy` task and in the CI workflow, so change both), so it is not a project dependency.

@@ -4,5 +4,5 @@
   "assets": {
     "directory": "./dist",
   },
-  "routes": [{ "pattern": "satplan.mutker.com", "custom_domain": true }],
+  "routes": [{ "pattern": "satplan.jgabor.se", "custom_domain": true }],
 }

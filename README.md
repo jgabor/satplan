@@ -6,13 +6,18 @@ All state lives in the URL (`?s=…`): built items, ranking metric, custom rates
 
 ## Develop
 
+Everything runs through `vp` (Vite+ 1.0). Node comes from `.node-version`, and `vp` downloads it when needed. The package manager is the npm that ships with that Node: `vp` picks npm because `package-lock.json` exists and nothing else declares a manager. Do not delete the lockfile, or `vp` falls back to pnpm.
+
 ```sh
 vp install
 vp dev        # dev server
 vp test       # unit tests
 vp check      # format, lint, type check
 vp build      # production build into dist/
+vp preview    # serve dist/ locally
 ```
+
+Project tasks live in `vite.config.ts` (`run.tasks`) and run with `vp run <task>`.
 
 ## Data
 
@@ -21,8 +26,8 @@ Recipe data comes from [satisfactory-factories/application](https://github.com/s
 `src/data/catalog.json` is generated and committed. To rebuild it:
 
 ```sh
-bun run catalog          # uses data/raw/, downloads it when missing
-bun run catalog:fetch    # downloads the pinned files again
+vp run catalog          # uses data/raw/, downloads it when missing; cached
+vp run catalog:fetch    # downloads the pinned files again
 ```
 
 To update the data, change `sha` in `data/sources.json` and run `catalog:fetch`.
@@ -47,7 +52,9 @@ How the catalog is built:
 The site is plain static files, served by Cloudflare Workers static assets (see `wrangler.jsonc`). R2 is not used.
 
 ```sh
-bun run deploy   # vp build && wrangler deploy
+vp run deploy   # vp check, vp test, vp build, then wrangler deploy
 ```
+
+Wrangler runs through `vp dlx` at the version pinned in the `deploy` task, so it is not a project dependency.
 
 The route in `wrangler.jsonc` attaches `satplan.mutker.com` as a custom domain. The `mutker.com` zone must be on the same Cloudflare account.

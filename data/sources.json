@@ -1,0 +1,8 @@
+{
+  "repo": "satisfactory-factories/application",
+  "sha": "154baf2e82fb6561b7042c47da2b827441b60321",
+  "files": {
+    "gameData": "parsing/gameData.json",
+    "gameDocs": "parsing/game-docs.json"
+  }
+}

@@ -1,0 +1,53 @@
+# satplan
+
+A small static site that lists self-contained Satisfactory production chains, one per storable part, with building counts and flow rates. It assumes pure nodes, free raw extraction and all alternate recipes unlocked.
+
+All state lives in the URL (`?s=…`): built items, ranking metric, custom rates and chosen chains. `#ItemId` opens one item.
+
+## Develop
+
+```sh
+vp install
+vp dev        # dev server
+vp test       # unit tests
+vp check      # format, lint, type check
+vp build      # production build into dist/
+```
+
+## Data
+
+Recipe data comes from [satisfactory-factories/application](https://github.com/satisfactory-factories/application), pinned to the commit in `data/sources.json`. Tiers come from the schematics in the same repo's `game-docs.json`.
+
+`src/data/catalog.json` is generated and committed. To rebuild it:
+
+```sh
+bun run catalog          # uses data/raw/, downloads it when missing
+bun run catalog:fetch    # downloads the pinned files again
+```
+
+To update the data, change `sha` in `data/sources.json` and run `catalog:fetch`.
+
+How the catalog is built:
+
+- Only recipes that can run from extractable raw inputs are kept. FICSMAS recipes, resource conversions, and anything that needs leaves, wood, mycelia, creature parts or power slugs are dropped.
+- A beam search keeps up to 15 candidate chains per item. Each chain uses one recipe per item. The pool mixes the best chains by stages, by buildings and by raw input types.
+- Fluid byproducts get the simplest disposal recipe that ends in something sinkable (for example heavy oil residue into petroleum coke). Solid leftovers go to an AWESOME Sink. Raw byproducts such as water are absorbed.
+- Items with no automatable chain (for example Biomass, Alien Protein and the plutonium parts) are left out. The script prints them.
+
+`src/calc.ts` turns a chain and a target rate into buildings, clock speeds and flows. It runs in the browser and in the catalog script, so both use the same rules. Byproducts of one stage reduce demand for the same item elsewhere in the chain.
+
+### Assumptions to know about
+
+- Pure Mk.2 miners give 240/min, oil extractors 240 m³/min, water extractors 120 m³/min.
+- Nitrogen uses one pure well satellite (120 m³/min each). The pressurizer is not counted.
+- The default target for each item is one building at 100% in the top-ranked chain. Changing the ranking metric does not change the default target.
+
+## Deploy
+
+The site is plain static files, served by Cloudflare Workers static assets (see `wrangler.jsonc`). R2 is not used.
+
+```sh
+bun run deploy   # vp build && wrangler deploy
+```
+
+The route in `wrangler.jsonc` attaches `satplan.mutker.com` as a custom domain. The `mutker.com` zone must be on the same Cloudflare account.

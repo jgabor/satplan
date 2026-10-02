@@ -1,0 +1,76 @@
+export type Recipe = {
+  id: string;
+  name: string;
+  alt: boolean;
+  building: string;
+  /** Ingredients: item id and amount per minute at 100% clock. */
+  ins: [item: string, perMin: number][];
+  /** Products at 100% clock. The first entry is the main product, the rest are byproducts. */
+  outs: [item: string, perMin: number][];
+};
+
+export type RawResource = {
+  name: string;
+  /** Output of one extractor on a pure node, per minute. */
+  perMin: number;
+  building: string;
+};
+
+export type ItemInfo = {
+  name: string;
+  fluid: boolean;
+  /** Group id. Only set for listed items. */
+  group?: string;
+};
+
+export type Catalog = {
+  meta: { sha: string };
+  groups: { id: string; name: string }[];
+  items: Record<string, ItemInfo>;
+  /** Listed item ids in display order (grouped, then by name). */
+  listed: string[];
+  raw: Record<string, RawResource>;
+  /** Building id to display name. */
+  buildings: Record<string, string>;
+  recipes: Record<string, Recipe>;
+  /** Leftover fluid item id to the recipe that turns it into something sinkable. */
+  disposal: Record<string, string>;
+  /** Listed item id to candidate chains. Each chain is a list of recipe ids. */
+  chains: Record<string, string[][]>;
+  /** Listed item id to its default target rate per minute. */
+  ref: Record<string, number>;
+};
+
+export type Stage = {
+  recipe: Recipe;
+  kind: "make" | "dispose";
+  /** Main product for "make" stages, the disposed item for "dispose" stages. */
+  item: string;
+  /** Fractional number of buildings at 100% clock. */
+  runs: number;
+  count: number;
+  /** Clock speed in percent when `count` buildings share the load. */
+  clock: number;
+  ins: [item: string, perMin: number][];
+  outs: [item: string, perMin: number, kind: "main" | "by"][];
+  level: number;
+};
+
+export type ExtractorLine = {
+  item: string;
+  perMin: number;
+  building: string;
+  count: number;
+};
+
+export type Result = {
+  rate: number;
+  stages: Stage[];
+  extractors: ExtractorLine[];
+  totals: [building: string, count: number][];
+  buildings: number;
+  stageCount: number;
+  rawTypes: number;
+  sinks: [item: string, perMin: number][];
+  unresolved: string[];
+};

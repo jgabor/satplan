@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="Self-contained Satisfactory production chains with building counts."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>satplan</title>
+  </head>
+  <body>
+    <header class="top">
+      <div class="bar-line">
+        <h1>satplan</h1>
+        <span id="count" class="count num"></span>
+        <span class="progress" aria-hidden="true"><span id="bar"></span></span>
+      </div>
+      <div class="filters">
+        <label class="search"
+          ><span class="sr">Search chains</span
+          ><input
+            id="q"
+            type="search"
+            placeholder="Search item, recipe or raw input ( / )"
+            autocomplete="off"
+            spellcheck="false"
+        /></label>
+        <label class="sr" for="metric">Rank chains by</label>
+        <select id="metric"></select>
+        <label class="todo"><input id="todo" type="checkbox" /> To build</label>
+        <button id="copy" type="button">Copy link</button>
+      </div>
+      <input id="link-box" type="text" readonly hidden aria-label="Link to copy" />
+    </header>
+    <main>
+      <p id="status" class="status num" aria-live="polite"></p>
+      <div id="list"></div>
+    </main>
+    <footer>
+      Recipe data from
+      <a
+        href="https://github.com/satisfactory-factories/application/blob/main/parsing/gameData.json"
+        >Satisfactory Factories</a
+      >
+      (<span id="source"></span>). Pure Mk.2 miners 240/min, oil extractors 240 m³/min, water
+      extractors 120 m³/min. All state is in the link.
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

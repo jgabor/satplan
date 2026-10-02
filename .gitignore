@@ -26,3 +26,6 @@ dist-ssr
 # Source data downloads (see data/sources.json)
 data/raw
 .wrangler
+
+# Local secrets (Cloudflare tokens)
+.dev.vars

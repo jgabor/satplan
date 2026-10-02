@@ -60,6 +60,8 @@ Every push to `main` runs `.github/workflows/ci.yml`: `vp check`, `vp test`, `vp
 - `CLOUDFLARE_API_TOKEN`: permissions Account › Workers Scripts: Edit, and Zone `jgabor.se` › Workers Routes: Edit and DNS: Edit.
 - `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account that holds the `jgabor.se` zone.
 
+To create or rotate the deploy token without the dashboard, put a bootstrap token in `.dev.vars` (git-ignored) as `CLOUDFLARE_API_TOKEN_BOOTSTRAP`, together with `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_DOMAIN` (the zone name, `jgabor.se`). The bootstrap token needs Account API Tokens Write and Account Settings Read on the account, and Zone Read on the zone. Then run `node scripts/cf-token.ts`. It creates the deploy token, sets both repository secrets with `gh`, and deletes older tokens with the same name.
+
 The route in `wrangler.jsonc` attaches `satplan.jgabor.se` as a custom domain. Wrangler creates the DNS record and certificate on the first deploy.
 
 To deploy by hand:

@@ -1,5 +1,5 @@
 import "./style.css";
-import { METRICS, rankChains, type Metric } from "./calc.ts";
+import { METRICS, rankChains, recipeTiers, type Metric } from "./calc.ts";
 import { catalog as cat } from "./catalog.ts";
 import { esc, renderList, type RowModel } from "./render.ts";
 import { buildUrl, readState, saveState, type State } from "./state.ts";
@@ -13,6 +13,7 @@ const searchEl = $<HTMLInputElement>("#q");
 const metricEl = $<HTMLSelectElement>("#metric");
 const minerEl = $<HTMLSelectElement>("#miner");
 const purityEl = $<HTMLSelectElement>("#purity");
+const tierEl = $<HTMLSelectElement>("#tier");
 const todoEl = $<HTMLInputElement>("#todo");
 const copyEl = $<HTMLButtonElement>("#copy");
 const linkBox = $<HTMLInputElement>("#link-box");
@@ -28,19 +29,32 @@ let openId: string | null = null;
 let query = "";
 let onlyTodo = false;
 const collapsed = new Set<string>();
-const cache = new Map<string, RowModel>();
+// A null entry means no chain is unlocked at the chosen tier.
+const cache = new Map<string, RowModel | null>();
 
 const chainKey = (ids: string[]) => [...ids].sort().join("|");
 
-function rowFor(id: string): RowModel {
+function rowFor(id: string): RowModel | null {
   const cached = cache.get(id);
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   const defaultRate = cat.ref[id];
   const customRate = id in state.rates;
   const rate = state.rates[id] ?? defaultRate;
   const saved = state.chosen[id];
-  const ranked = rankChains(cat, id, rate, state.metric, saved ? [saved] : [], state.extraction);
+  const ranked = rankChains(
+    cat,
+    id,
+    rate,
+    state.metric,
+    saved ? [saved] : [],
+    state.extraction,
+    state.tier,
+  );
+  if (!ranked.length) {
+    cache.set(id, null);
+    return null;
+  }
   const match = saved ? ranked.find((r) => chainKey(r.ids) === chainKey(saved)) : undefined;
   const selected = match ?? ranked[0];
   const row: RowModel = {
@@ -68,7 +82,7 @@ function haystack(row: RowModel): string {
 }
 
 function render() {
-  const all = cat.listed.map(rowFor);
+  const all = cat.listed.map(rowFor).filter((r): r is RowModel => r !== null);
   const builtTotal = all.filter((r) => r.built).length;
   countEl.innerHTML = `<b>${builtTotal}</b> / ${all.length} built`;
   barEl.style.width = `${(builtTotal / all.length) * 100}%`;
@@ -142,7 +156,7 @@ listEl.addEventListener("click", (event) => {
   const pick = target.closest<HTMLElement>("[data-pick]");
   if (pick) {
     const id = pick.dataset.pick!;
-    const row = rowFor(id);
+    const row = rowFor(id)!;
     const chosen = row.ranked[Number(pick.dataset.index)];
     if (chosen === row.ranked[0]) delete state.chosen[id];
     else state.chosen[id] = chosen.ids;
@@ -203,6 +217,11 @@ minerEl.addEventListener("change", () => {
   commit();
 });
 
+tierEl.addEventListener("change", () => {
+  state.tier = tierEl.value === "" ? null : Number(tierEl.value);
+  commit();
+});
+
 purityEl.addEventListener("change", () => {
   state.extraction.purity = purityEl.value as Extraction["purity"];
   commit();
@@ -249,6 +268,12 @@ async function init() {
   state.built = state.built.filter((id) => listedSet.has(id));
   minerEl.value = String(state.extraction.miner);
   purityEl.value = state.extraction.purity;
+  tierEl.innerHTML =
+    '<option value="">All tiers</option>' +
+    recipeTiers(cat)
+      .map((t) => `<option value="${t}">Up to tier ${t}</option>`)
+      .join("");
+  tierEl.value = state.tier === null ? "" : String(state.tier);
   metricEl.innerHTML = METRICS.map(
     (m) =>
       `<option value="${m.id}"${m.id === state.metric ? " selected" : ""}>${esc(m.label)}</option>`,

@@ -6,6 +6,7 @@ describe("state", () => {
     const state = {
       metric: 2 as const,
       extraction: { miner: 3 as const, purity: "normal" as const },
+      tier: 5,
       built: ["IronScrew", "Computer"],
       chosen: { Computer: ["Computer", "Plastic"] },
       rates: { IronScrew: 120 },
@@ -43,6 +44,23 @@ describe("state", () => {
       expect(await decodeState(text)).toEqual(emptyState());
     },
   );
+
+  it("round trips the tier limit, including tier 0", async () => {
+    for (const tier of [0, 5]) {
+      const state = { ...emptyState(), tier };
+      expect(await decodeState(await encodeState(state))).toEqual(state);
+    }
+  });
+
+  it.each([-1, 1.5, 99, "3", null])("ignores an invalid tier: %j", async (tier) => {
+    const text = "j" + btoa(JSON.stringify({ v: 1, t: tier }));
+    expect(await decodeState(text)).toEqual(emptyState());
+  });
+
+  it("accepts the power ranking metric", async () => {
+    const state = { ...emptyState(), metric: 3 as const };
+    expect(await decodeState(await encodeState(state))).toEqual(state);
+  });
 
   it("uses only URL-safe characters", async () => {
     const built = Array.from({ length: 90 }, (_, i) => `Item${i}`);

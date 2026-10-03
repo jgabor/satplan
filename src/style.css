@@ -175,7 +175,7 @@ h1 {
 }
 
 .search {
-  flex: 1 1 220px;
+  flex: 1 1 260px;
 }
 
 .search input {
@@ -377,7 +377,7 @@ footer {
   flex: 1;
   min-width: 0;
   display: grid;
-  grid-template-columns: 28px minmax(110px, 1.1fr) minmax(130px, 1.2fr) 86px 76px 70px minmax(
+  grid-template-columns: 28px minmax(110px, 1.1fr) minmax(130px, 1.2fr) 86px 76px 70px 76px minmax(
       100px,
       1.2fr
     );
@@ -521,7 +521,7 @@ footer {
 
 table {
   width: 100%;
-  min-width: 640px;
+  min-width: 700px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -590,7 +590,7 @@ h3 small {
 
 .alt {
   display: grid;
-  grid-template-columns: 150px minmax(110px, 0.7fr) 1.6fr;
+  grid-template-columns: 210px minmax(110px, 0.7fr) 1.6fr;
   gap: 8px;
   align-items: baseline;
   text-align: left;
@@ -633,10 +633,10 @@ footer a {
 
 @media (max-width: 860px) {
   .main {
-    grid-template-columns: 40px 1fr 84px 70px 66px;
+    grid-template-columns: 40px 1fr 84px 70px 66px 76px;
     grid-template-areas:
-      "icon name rate stages bldgs"
-      "icon recipe recipe chips chips";
+      "icon name rate stages bldgs power"
+      "icon recipe recipe chips chips chips";
     row-gap: 2px;
   }
 
@@ -667,6 +667,10 @@ footer a {
 
   .bldgs {
     grid-area: bldgs;
+  }
+
+  .power {
+    grid-area: power;
   }
 
   .chips {
@@ -711,6 +715,7 @@ footer a {
   }
 
   #metric,
+  #tier,
   .extraction {
     grid-column: 1 / -1;
   }
@@ -742,7 +747,7 @@ footer a {
     grid-template-columns: 40px minmax(0, 1fr) auto auto;
     grid-template-areas:
       "icon name name rate"
-      "icon recipe recipe recipe"
+      "icon recipe recipe power"
       "chips chips stages bldgs";
   }
 

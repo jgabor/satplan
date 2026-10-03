@@ -3,6 +3,13 @@ import type { Catalog, Extraction, ExtractorLine, Recipe, Result, Stage } from "
 export const DEFAULT_EXTRACTION: Extraction = { miner: 2, purity: "pure" };
 
 const EPS = 1e-9;
+
+/** Power use grows with clock speed to this power: 50% clock draws 40% of the power, not 50%. */
+const CLOCK_POWER_EXPONENT = 1.321928;
+
+/** Power draw of `count` identical buildings sharing the load at `clock` percent. */
+const powerAt = (base: number, count: number, clock: number) =>
+  base * count * (clock / 100) ** CLOCK_POWER_EXPONENT;
 const MAX_ITERATIONS = 500;
 
 function add(map: Map<string, number>, key: string, value: number) {
@@ -129,6 +136,7 @@ export function evaluate(
       ins: recipe.ins.map(([i, a]) => [i, a * n]),
       outs: recipe.outs.map(([i, a], k) => [i, a * n, k === 0 ? "main" : "by"]),
       level,
+      power: powerAt(recipe.power, count, (n / count) * 100),
     });
   }
   const assignedIds = new Set([...assigned.values()].map((r) => r.id));
@@ -146,6 +154,7 @@ export function evaluate(
       ins: recipe.ins.map(([i, a]) => [i, a * n]),
       outs: recipe.outs.map(([i, a]) => [i, a * n, "by"]),
       level: maxLevel + 1,
+      power: powerAt(recipe.power, count, (n / count) * 100),
     });
   }
   stages.sort((a, b) => a.level - b.level || a.recipe.name.localeCompare(b.recipe.name));
@@ -161,6 +170,9 @@ export function evaluate(
     const purityFactor = purity === "impure" ? 0.25 : purity === "normal" ? 0.5 : 1;
     const capacity = info.perMin * purityFactor * (mined ? 2 ** (extraction.miner - 2) : 1);
     const count = countFor(perMin / capacity);
+    const clock = (perMin / (count * capacity)) * 100;
+    // Each miner level draws three times the power of the one below it (5, 15, 45 MW).
+    const basePower = info.power * (mined ? 3 ** (extraction.miner - 2) : 1);
     extractors.push({
       item,
       perMin,
@@ -170,8 +182,9 @@ export function evaluate(
           ? `Well satellite (${purity})`
           : info.building,
       count,
-      clock: (perMin / (count * capacity)) * 100,
+      clock,
       purity,
+      power: powerAt(basePower, count, clock),
     });
   }
   extractors.sort((a, b) => a.item.localeCompare(b.item));
@@ -193,6 +206,7 @@ export function evaluate(
     extractors,
     totals: totalList,
     buildings: totalList.reduce((sum, [, n]) => sum + n, 0),
+    power: [...stages, ...extractors].reduce((sum, line) => sum + line.power, 0),
     stageCount: stages.length,
     rawTypes: extractors.length,
     sinks,
@@ -207,18 +221,26 @@ function activeRecipes(cat: Catalog, assigned: Map<string, Recipe>, runs: Map<st
   return list;
 }
 
-export type Metric = 0 | 1 | 2;
+export type Metric = 0 | 1 | 2 | 3;
 
 export const METRICS: { id: Metric; label: string }[] = [
   { id: 0, label: "Fewest stages, then buildings" },
   { id: 1, label: "Fewest buildings, then stages" },
   { id: 2, label: "Fewest raw inputs, then stages" },
+  { id: 3, label: "Lowest power, then stages" },
 ];
+
+/** Tiers that unlock at least one recipe, lowest first. */
+export function recipeTiers(cat: Catalog): number[] {
+  return [...new Set(Object.values(cat.recipes).map((r) => r.tier))].sort((a, b) => a - b);
+}
 
 /** Sort key for a result. Chains with a stuck byproduct always sort last. */
 export function sortKey(result: Result, metric: Metric): number[] {
   const { stageCount, buildings, rawTypes } = result;
   const stuck = result.unresolved.length > 0 ? 1 : 0;
+  // Rounded so float noise between equal chains cannot decide the order.
+  if (metric === 3) return [stuck, Math.round(result.power * 1000) / 1000, stageCount, buildings];
   if (metric === 1) return [stuck, buildings, stageCount, rawTypes];
   if (metric === 2) return [stuck, rawTypes, stageCount, buildings];
   return [stuck, stageCount, buildings, rawTypes];
@@ -231,7 +253,10 @@ export function compareKeys(a: number[], b: number[]): number {
 
 export type Ranked = { ids: string[]; result: Result };
 
-/** Evaluates every candidate for an item at one rate and sorts them best first. */
+/**
+ * Evaluates every candidate for an item at one rate and sorts them best first.
+ * With `maxTier`, chains that use a recipe unlocked in a later tier are left out.
+ */
 export function rankChains(
   cat: Catalog,
   item: string,
@@ -239,6 +264,7 @@ export function rankChains(
   metric: Metric,
   extra: string[][] = [],
   extraction: Extraction = DEFAULT_EXTRACTION,
+  maxTier: number | null = null,
 ): Ranked[] {
   const seen = new Set<string>();
   const ranked: Ranked[] = [];
@@ -247,7 +273,9 @@ export function rankChains(
     if (seen.has(key)) continue;
     seen.add(key);
     const result = evaluate(cat, item, ids, rate, extraction);
-    if (result) ranked.push({ ids, result });
+    if (!result) continue;
+    if (maxTier !== null && result.stages.some((s) => s.recipe.tier > maxTier)) continue;
+    ranked.push({ ids, result });
   }
   ranked.sort(
     (a, b) =>

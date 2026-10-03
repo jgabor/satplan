@@ -3,6 +3,10 @@ export type Recipe = {
   name: string;
   alt: boolean;
   building: string;
+  /** Power draw of one building at 100% clock, in MW. Variable-power buildings use their average. */
+  power: number;
+  /** Tier that unlocks the recipe and its building. Hard-drive alternates only wait for the building. */
+  tier: number;
   /** Ingredients: item id and amount per minute at 100% clock. */
   ins: [item: string, perMin: number][];
   /** Products at 100% clock. The first entry is the main product, the rest are byproducts. */
@@ -14,6 +18,8 @@ export type RawResource = {
   /** Output of one extractor on a pure node, per minute. */
   perMin: number;
   building: string;
+  /** Power draw of one extractor at 100% clock, in MW. Miners are listed at Mk.2. */
+  power: number;
 };
 
 export type Extraction = {
@@ -59,6 +65,8 @@ export type Stage = {
   ins: [item: string, perMin: number][];
   outs: [item: string, perMin: number, kind: "main" | "by"][];
   level: number;
+  /** Power draw of all `count` buildings at `clock`, in MW. */
+  power: number;
 };
 
 export type ExtractorLine = {
@@ -68,6 +76,8 @@ export type ExtractorLine = {
   count: number;
   clock: number;
   purity?: Extraction["purity"];
+  /** Power draw of all `count` extractors at `clock`, in MW. */
+  power: number;
 };
 
 export type Result = {
@@ -76,6 +86,8 @@ export type Result = {
   extractors: ExtractorLine[];
   totals: [building: string, count: number][];
   buildings: number;
+  /** Total power draw of every stage and extractor, in MW. */
+  power: number;
   stageCount: number;
   rawTypes: number;
   sinks: [item: string, perMin: number][];

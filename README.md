@@ -2,7 +2,7 @@
 
 A small static site that lists self-contained Satisfactory production chains, one per storable part, with building counts and flow rates. It defaults to pure nodes and Mk.2 miners, with free raw extraction and all alternate recipes unlocked.
 
-All state lives in the URL (`?s=…`): built items, ranking metric, miner level, node purity, custom rates and chosen chains. `#ItemId` opens one item.
+All state lives in the URL (`?s=…`): built items, ranking metric, miner level, node purity, unlocked tier, custom rates and chosen chains. `#ItemId` opens one item.
 
 The same state is also saved to `localStorage` (`satplan:state`) on every change. A link with `?s=` always wins, so a shared link shows the sender's plan. Without one (for example a browser that opens the bare address), the saved plan is restored. Changing anything in a shared link overwrites the saved plan. Which tiers are collapsed and whether the phone options panel is open are not saved.
 
@@ -49,6 +49,8 @@ How the catalog is built:
 
 ### Assumptions to know about
 
+- Power draw is in MW. A building at clock `c` draws its 100% power times `(c/100)^1.321928`, so a stage of `n` buildings sharing a load uses `n × power × (c/100)^1.321928`. Miners draw 5, 15 and 45 MW at Mk.1, Mk.2 and Mk.3, oil extractors 40 MW and water extractors 20 MW. The Particle Accelerator, Converter and Quantum Encoder vary with load, and the data gives an average, which is what the totals use. The Resource Well Pressurizer is not counted, the same as for nitrogen extraction below. Belts, pipes and pumps are not counted.
+- The tier filter ("Up to tier N") hides chains that use a recipe unlocked after tier N. A recipe is available at the earliest tier of its non-alternate schematic (MAM research counts as the tier the schematics give it) or the tier of its building, whichever is later. Buildings use their own build recipe, except that this data calls the Smelter's `SmelterBasicMk1` and the Foundry's `SmelterMk1`. Hard-drive alternates have no tier, so they wait only for their building. The filter does not check extractor or node availability, so it assumes you can reach every raw resource.
 - Miner level (Mk.1, Mk.2 or Mk.3) and node purity (impure, normal or pure) apply to all chains. The defaults are Mk.2 and pure, giving 240/min per miner at 100% clock.
 - Node purity also applies to oil extractors (240 m³/min on pure nodes) and nitrogen well satellites (120 m³/min on pure satellites). Normal nodes give half the pure rate; impure nodes give one quarter. Water extractors stay at 120 m³/min. The nitrogen pressurizer is not counted.
 - Extractor counts use 100% clock capacity, then share the load at the displayed clock speed. Overclocking and belt limits are not modeled.

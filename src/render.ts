@@ -68,6 +68,7 @@ function renderRow(cat: Catalog, row: RowModel, open: boolean): string {
       <span class="num rate">${fmt(row.rate)}/min</span>
       <span class="num stat stages">${result.stageCount} <small>stages</small></span>
       <span class="num stat bldgs">${result.buildings} <small>bldgs</small></span>
+      <span class="num stat power">${fmt(result.power)} <small>MW</small></span>
       <span class="chips">${rawChips(cat, result)}</span>
     </button>
   </div>
@@ -95,7 +96,8 @@ function renderStages(cat: Catalog, result: Result): string {
       <td>${icon(e.item, "sm")}${esc(itemName(cat, e.item))}${e.purity ? ` (${e.purity})` : ""}</td>
       <td></td>
       <td class="num">${flows(cat, [[e.item, e.perMin]])}</td>
-      <td class="num">${fmt(e.clock)}%</td></tr>`);
+      <td class="num">${fmt(e.clock)}%</td>
+      <td class="num">${fmt(e.power)}</td></tr>`);
   }
   for (const s of result.stages) {
     rows.push(`<tr class="${s.kind}">
@@ -105,10 +107,11 @@ function renderStages(cat: Catalog, result: Result): string {
       <td>${recipeLabel(s.recipe)}${s.kind === "dispose" ? " <small>disposal</small>" : ""}</td>
       <td class="num">${flows(cat, s.ins)}</td>
       <td class="num">${flows(cat, s.outs)}</td>
-      <td class="num">${fmt(s.clock)}%</td></tr>`);
+      <td class="num">${fmt(s.clock)}%</td>
+      <td class="num">${fmt(s.power)}</td></tr>`);
   }
   return `<div class="scroll"><table>
-    <thead><tr><th>#</th><th>Count</th><th>Building</th><th>Recipe</th><th>In /min</th><th>Out /min</th><th>Clock</th></tr></thead>
+    <thead><tr><th>#</th><th>Count</th><th>Building</th><th>Recipe</th><th>In /min</th><th>Out /min</th><th>Clock</th><th>MW</th></tr></thead>
     <tbody>${rows.join("")}</tbody></table></div>`;
 }
 
@@ -119,6 +122,7 @@ function renderDetail(cat: Catalog, row: RowModel): string {
   const totals = result.totals
     .map(([b, n]) => `<span class="chip total"><b>${n}×</b> ${esc(buildingName(cat, b))}</span>`)
     .join("");
+  const power = `<span class="chip total"><b>${fmt(result.power)} MW</b> power</span>`;
   const sinks = result.sinks
     .map(([item, n]) => `${fmt(n)}/min ${esc(itemName(cat, item))}`)
     .join(", ");
@@ -131,7 +135,7 @@ function renderDetail(cat: Catalog, row: RowModel): string {
       const isSelected = r === row.selected;
       const raws = r.result.extractors.map((e) => esc(itemName(cat, e.item))).join(", ");
       return `<button type="button" class="alt${isSelected ? " selected" : ""}" data-pick="${id}" data-index="${index}" data-fk="pick:${id}:${index}" aria-pressed="${isSelected}">
-        <span class="alt-stats num">${r.result.stageCount} stages · ${r.result.buildings} bldgs</span>
+        <span class="alt-stats num">${r.result.stageCount} stages · ${r.result.buildings} bldgs · ${fmt(r.result.power)} MW</span>
         <span class="alt-raw">${raws}${r.result.unresolved.length ? ' · <span class="warn">stuck byproduct</span>' : ""}</span>
         <span class="alt-names">${index === 0 ? '<span class="tag">best</span> ' : ""}${names}</span>
       </button>`;
@@ -144,7 +148,7 @@ function renderDetail(cat: Catalog, row: RowModel): string {
     <span class="note">${fmt(final.count)}× ${esc(buildingName(cat, final.recipe.building))} at ${fmt(final.clock)}% for the final stage</span>
     ${row.customRate ? `<button type="button" class="link" data-reset-rate="${id}" data-fk="reset:${id}">Reset to ${fmt(row.defaultRate)}/min</button>` : `<span class="note dim">Default: one building at 100%</span>`}
   </div>
-  <div class="totals">${totals}</div>
+  <div class="totals">${totals}${power}</div>
   ${renderStages(cat, result)}
   ${sinks ? `<p class="sink">Send to an AWESOME Sink: ${sinks}</p>` : ""}
   ${row.stale ? '<p class="warn">Your saved chain is no longer available. Showing the best chain.</p>' : ""}

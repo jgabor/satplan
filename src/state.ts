@@ -4,6 +4,8 @@ import type { Extraction } from "./types.ts";
 export type State = {
   metric: Metric;
   extraction: Extraction;
+  /** Highest unlocked tier, or null when every tier counts as unlocked. */
+  tier: number | null;
   /** Item ids marked as built. */
   built: string[];
   /** Item id to the recipe ids of the chain picked by the user. */
@@ -15,12 +17,15 @@ export type State = {
 export const emptyState = (): State => ({
   metric: 0,
   extraction: { ...DEFAULT_EXTRACTION },
+  tier: null,
   built: [],
   chosen: {},
   rates: {},
 });
 
 const VERSION = 1;
+// Any number above the highest real tier is damage, not a setting.
+const MAX_TIER = 20;
 // Prefix tells the decoder how the payload was packed, so links keep working
 // in browsers without CompressionStream.
 const PACKED = "z";
@@ -33,6 +38,7 @@ type Wire = {
   o?: Record<string, string[]>;
   r?: Record<string, number>;
   e?: Partial<Extraction>;
+  t?: number;
 };
 
 function toWire(state: State): Wire {
@@ -47,6 +53,7 @@ function toWire(state: State): Wire {
   if (state.extraction.purity !== DEFAULT_EXTRACTION.purity)
     extraction.purity = state.extraction.purity;
   if (Object.keys(extraction).length) wire.e = extraction;
+  if (state.tier !== null) wire.t = state.tier;
   return wire;
 }
 
@@ -55,7 +62,8 @@ function fromWire(value: unknown): State {
   if (!value || typeof value !== "object") return state;
   const wire = value as Partial<Wire>;
   if (wire.v !== VERSION) return state;
-  if (wire.m === 1 || wire.m === 2) state.metric = wire.m;
+  if (wire.m === 1 || wire.m === 2 || wire.m === 3) state.metric = wire.m;
+  if (Number.isInteger(wire.t) && wire.t! >= 0 && wire.t! <= MAX_TIER) state.tier = wire.t!;
   if (wire.e?.miner === 1 || wire.e?.miner === 3) state.extraction.miner = wire.e.miner;
   if (wire.e?.purity === "impure" || wire.e?.purity === "normal")
     state.extraction.purity = wire.e.purity;

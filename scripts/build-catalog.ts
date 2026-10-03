@@ -10,7 +10,7 @@ type DataRecipe = {
   displayName: string;
   ingredients: { part: string; perMin: number }[];
   products: { part: string; perMin: number; isByProduct: boolean }[];
-  building: { name: string };
+  building: { name: string; power: number };
   isAlternate: boolean;
   isFicsmas: boolean;
   extraction?: {
@@ -21,6 +21,8 @@ type DataRecipe = {
 
 type GameData = {
   recipes: DataRecipe[];
+  /** Building id to power draw in MW. */
+  buildings: Record<string, number>;
   items: {
     parts: Record<string, { name: string; isFluid: boolean; isFicsmas: boolean }>;
     rawResources: Record<string, { name: string }>;
@@ -77,6 +79,7 @@ for (const r of data.recipes) {
       name,
       perMin: r.extraction.well.satelliteRates.pure,
       building: "Well satellite (pure)",
+      power: data.buildings.frackingextractor,
     };
     continue;
   }
@@ -85,9 +88,27 @@ for (const r of data.recipes) {
   const pump = ex.find((e) => e.building === "oilpump");
   const water = ex.find((e) => e.building === "waterpump");
   // Purity multipliers: pure is 2x for miners and oil extractors. Water has one purity.
-  if (mk2) raw[item] = { name, perMin: mk2.ratePerMin * 2, building: "Miner Mk.2" };
-  else if (pump) raw[item] = { name, perMin: pump.ratePerMin * 2, building: "Oil Extractor" };
-  else if (water) raw[item] = { name, perMin: water.ratePerMin, building: "Water Extractor" };
+  if (mk2)
+    raw[item] = {
+      name,
+      perMin: mk2.ratePerMin * 2,
+      building: "Miner Mk.2",
+      power: data.buildings.minermk2,
+    };
+  else if (pump)
+    raw[item] = {
+      name,
+      perMin: pump.ratePerMin * 2,
+      building: "Oil Extractor",
+      power: data.buildings.oilpump,
+    };
+  else if (water)
+    raw[item] = {
+      name,
+      perMin: water.ratePerMin,
+      building: "Water Extractor",
+      power: data.buildings.waterpump,
+    };
 }
 const RAW = new Set(Object.keys(raw));
 const parts = data.items.parts;
@@ -111,6 +132,8 @@ for (const r of usable) {
     name: r.displayName.replace(/^Alternate: /, ""),
     alt: r.isAlternate,
     building: r.building.name,
+    power: r.building.power,
+    tier: 0,
     ins: r.ingredients.map((i) => [i.part, i.perMin]),
     outs: outs.map((p) => [p.part, p.perMin]),
   };
@@ -307,6 +330,35 @@ for (const s of schematics) {
     }
   }
 }
+
+// A recipe is available once its earliest schematic is done. The SAM research tree is listed
+// at tier 0 in the schematics, which would make late recipes look free, so it is skipped.
+function ownTier(id: string): number | undefined {
+  const tiers = (unlocks.get(id) ?? [])
+    .filter((u) => !(u.type === "EST_MAM" && u.tier === 0))
+    .map((u) => u.tier);
+  return tiers.length ? Math.min(...tiers) : undefined;
+}
+// A building is unlocked by its own build recipe. The data names the Smelter's build recipe
+// SmelterBasicMk1 and uses SmelterMk1 for the Foundry. Recipes can be unlocked before their
+// building (the tutorial hands out Reinforced Iron Plate before the Assembler), so each recipe
+// waits for both. Hard-drive alternates have no tier of their own and wait only for the building.
+const BUILD_RECIPE_ALIAS: Record<string, string> = {
+  smeltermk1: "SmelterBasicMk1",
+  foundrymk1: "SmelterMk1",
+};
+const buildingTier = new Map<string, number>();
+for (const building of new Set(Object.values(recipes).map((r) => r.building))) {
+  const key =
+    BUILD_RECIPE_ALIAS[building] ?? [...unlocks.keys()].find((k) => k.toLowerCase() === building);
+  const tier = key === undefined ? undefined : ownTier(key);
+  if (tier === undefined) throw new Error(`no unlock tier for building ${building}`);
+  buildingTier.set(building, tier);
+}
+for (const r of Object.values(recipes)) {
+  r.tier = Math.max(ownTier(r.id) ?? 0, buildingTier.get(r.building)!);
+}
+
 const TYPE_RANK: Record<string, number> = {
   EST_Tutorial: 0,
   EST_Milestone: 1,

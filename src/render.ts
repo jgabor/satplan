@@ -158,6 +158,7 @@ export function renderList(
   rows: RowModel[],
   totals: Map<string, { built: number; total: number }>,
   openId: string | null,
+  collapsed: ReadonlySet<string>,
 ): string {
   if (!rows.length) return '<p class="empty">No chains match.</p>';
   const out: string[] = [];
@@ -165,10 +166,12 @@ export function renderList(
     const inGroup = rows.filter((r) => r.group === group.id);
     if (!inGroup.length) continue;
     const t = totals.get(group.id)!;
+    const id = esc(group.id);
+    const open = !collapsed.has(group.id);
     out.push(
-      `<section class="group"><h2>${esc(group.name)} <span class="num">${t.built}/${t.total}</span></h2>`,
+      `<section class="group"><h2><button type="button" class="fold-head" data-fold="${id}" data-fk="fold:${id}" aria-expanded="${open}"><span>${esc(group.name)}</span> <span class="num">${t.built}/${t.total}</span></button></h2>`,
     );
-    for (const row of inGroup) out.push(renderRow(cat, row, row.id === openId));
+    if (open) for (const row of inGroup) out.push(renderRow(cat, row, row.id === openId));
     out.push("</section>");
   }
   return out.join("");

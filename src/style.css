@@ -1,3 +1,10 @@
+@font-face {
+  font-family: "Roboto Condensed";
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/roboto-condensed-latin-700-normal.woff2") format("woff2");
+}
+
 :root {
   --bg: #161616;
   --panel: #212121;
@@ -184,6 +191,30 @@ h1 {
   gap: 8px;
 }
 
+.settings {
+  display: contents;
+}
+
+.options {
+  display: none;
+}
+
+.options::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 0 3px 8px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.options[aria-expanded="true"]::after {
+  margin-bottom: 0;
+  transform: rotate(-135deg);
+}
+
 .todo {
   display: flex;
   align-items: center;
@@ -192,14 +223,16 @@ h1 {
 }
 
 #copy,
+.options,
 .link {
   background: var(--panel-2);
   border: 1px solid var(--line-strong);
   padding: 6px 12px;
 }
 
-#copy {
-  font: 600 13px/1.4 var(--display);
+#copy,
+.options {
+  font: 700 13px/1.4 var(--display);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -212,6 +245,7 @@ h1 {
 
 @media (hover: hover) {
   #copy:hover,
+  .options:hover,
   .link:hover {
     background: var(--accent);
     border-color: var(--accent);
@@ -236,10 +270,28 @@ footer {
   padding: 0 12px;
 }
 
-.status {
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   margin: 10px 0 6px;
+}
+
+.status {
+  margin: 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+.fold {
+  padding: 4px 0;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font: 700 12px/1.4 var(--display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .group {
@@ -249,11 +301,7 @@ footer {
 }
 
 .group h2 {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
   margin: 0;
-  padding: 7px 12px;
   background: var(--panel-2);
   border-left: 4px solid var(--accent);
   font: 700 14px/1.3 var(--display);
@@ -261,7 +309,36 @@ footer {
   text-transform: uppercase;
 }
 
-.group h2 .num {
+.fold-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 12px;
+  background: none;
+  border: 0;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+}
+
+.fold-head::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: 0 3px 3px 0;
+  border: solid var(--accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.fold-head[aria-expanded="false"]::before {
+  margin: 0 0 0 -3px;
+  transform: rotate(-45deg);
+}
+
+.fold-head .num {
+  margin-left: auto;
   color: var(--muted);
   font-weight: 400;
   font-size: 12px;
@@ -381,7 +458,7 @@ footer {
 .tag {
   padding: 0 4px;
   border: 1px solid var(--line-strong);
-  font: 600 10px/1.4 var(--display);
+  font: 700 10px/1.4 var(--display);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
@@ -451,7 +528,7 @@ table {
 
 th {
   text-align: left;
-  font: 600 11px/1.4 var(--display);
+  font: 700 11px/1.4 var(--display);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -496,7 +573,7 @@ td.num:nth-child(6) {
 
 h3 {
   margin: 14px 0 6px;
-  font: 600 12px/1.4 var(--display);
+  font: 700 12px/1.4 var(--display);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--accent);
@@ -610,10 +687,29 @@ footer a {
 @media (max-width: 560px) {
   .filters {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
-  .search,
+  .search {
+    grid-column: 1 / -1;
+  }
+
+  .options {
+    display: block;
+  }
+
+  .settings {
+    display: none;
+    order: 1;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .options-open .settings {
+    display: grid;
+  }
+
   #metric,
   .extraction {
     grid-column: 1 / -1;
@@ -627,10 +723,19 @@ footer a {
   .filters input[type="search"],
   .filters select,
   #copy,
+  .options,
   .todo,
   .rate-input {
     min-height: 44px;
     font-size: 16px;
+  }
+
+  .fold-head {
+    min-height: 44px;
+  }
+
+  .fold {
+    padding-block: 10px;
   }
 
   .main {

@@ -111,9 +111,27 @@ export async function decodeState(text: string | null): Promise<State> {
 }
 
 const PARAM = "s";
+const STORAGE_KEY = "satplan:state";
 
-export function readUrlState(): Promise<State> {
-  return decodeState(new URL(location.href).searchParams.get(PARAM));
+// Storage can be missing or throw (private mode, sandboxed frames), and the URL still works then.
+function storage(): Storage | null {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** The link wins, so a shared link shows the sender's plan. Otherwise use the last saved plan. */
+export function readState(): Promise<State> {
+  const fromUrl = new URL(location.href).searchParams.get(PARAM);
+  let saved: string | null = null;
+  try {
+    saved = storage()?.getItem(STORAGE_KEY) ?? null;
+  } catch {
+    // Reading can fail even when the storage object exists.
+  }
+  return decodeState(fromUrl ?? saved);
 }
 
 export async function buildUrl(state: State, hash = location.hash): Promise<string> {
@@ -126,9 +144,18 @@ export async function buildUrl(state: State, hash = location.hash): Promise<stri
 }
 
 let pending = 0;
-export function saveUrlState(state: State) {
+/** Writes the state to the address bar and to local storage. */
+export function saveState(state: State): Promise<void> {
   const ticket = ++pending;
-  void buildUrl(state).then((url) => {
-    if (ticket === pending) history.replaceState(null, "", url);
+  return buildUrl(state).then((url) => {
+    if (ticket !== pending) return;
+    history.replaceState(null, "", url);
+    const text = new URL(url).searchParams.get(PARAM);
+    try {
+      if (text) storage()?.setItem(STORAGE_KEY, text);
+      else storage()?.removeItem(STORAGE_KEY);
+    } catch {
+      // A full or blocked store only loses the fallback copy.
+    }
   });
 }

@@ -4,6 +4,10 @@ A small static site that lists self-contained Satisfactory production chains, on
 
 All state lives in the URL (`?s=…`): built items, ranking metric, miner level, node purity, custom rates and chosen chains. `#ItemId` opens one item.
 
+The same state is also saved to `localStorage` (`satplan:state`) on every change. A link with `?s=` always wins, so a shared link shows the sender's plan. Without one (for example a browser that opens the bare address), the saved plan is restored. Changing anything in a shared link overwrites the saved plan. Which tiers are collapsed and whether the phone options panel is open are not saved.
+
+The headings use Roboto Condensed (700, latin subset), bundled in `src/fonts/` under the SIL Open Font License (`OFL.txt`).
+
 ## Develop
 
 Everything runs through `vp` (Vite+ 1.0). Node comes from `.node-version`, and `vp` downloads it when needed. The package manager is the npm that ships with that Node: `vp` picks npm because `package-lock.json` exists and nothing else declares a manager. Do not delete the lockfile, or `vp` falls back to pnpm.

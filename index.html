@@ -29,29 +29,43 @@
             autocomplete="off"
             spellcheck="false"
         /></label>
-        <label class="sr" for="metric">Rank chains by</label>
-        <select id="metric"></select>
-        <div class="extraction">
-          <label class="sr" for="miner">Miner level</label>
-          <select id="miner">
-            <option value="1">Miner Mk.1</option>
-            <option value="2" selected>Miner Mk.2</option>
-            <option value="3">Miner Mk.3</option>
-          </select>
-          <label class="sr" for="purity">Node purity</label>
-          <select id="purity">
-            <option value="impure">Impure nodes</option>
-            <option value="normal">Normal nodes</option>
-            <option value="pure" selected>Pure nodes</option>
-          </select>
+        <div id="settings" class="settings">
+          <label class="sr" for="metric">Rank chains by</label>
+          <select id="metric"></select>
+          <div class="extraction">
+            <label class="sr" for="miner">Miner level</label>
+            <select id="miner">
+              <option value="1">Miner Mk.1</option>
+              <option value="2" selected>Miner Mk.2</option>
+              <option value="3">Miner Mk.3</option>
+            </select>
+            <label class="sr" for="purity">Node purity</label>
+            <select id="purity">
+              <option value="impure">Impure nodes</option>
+              <option value="normal">Normal nodes</option>
+              <option value="pure" selected>Pure nodes</option>
+            </select>
+          </div>
         </div>
         <label class="todo"><input id="todo" type="checkbox" /> To build</label>
         <button id="copy" type="button">Copy link</button>
+        <button
+          id="options"
+          class="options"
+          type="button"
+          aria-expanded="false"
+          aria-controls="settings"
+        >
+          Options
+        </button>
       </div>
       <input id="link-box" type="text" readonly hidden aria-label="Link to copy" />
     </header>
     <main>
-      <p id="status" class="status num" aria-live="polite"></p>
+      <div class="statusbar">
+        <p id="status" class="status num" aria-live="polite"></p>
+        <button id="fold" class="fold" type="button"></button>
+      </div>
       <div id="list"></div>
     </main>
     <footer>
@@ -60,8 +74,8 @@
         href="https://github.com/satisfactory-factories/application/blob/main/parsing/gameData.json"
         >Satisfactory Factories</a
       >
-      (<span id="source"></span>). Water extractors 120 m³/min. All state is in the link. Item icons
-      are Satisfactory game assets © Coffee Stain Studios.
+      (<span id="source"></span>). Water extractors 120 m³/min. Your plan is kept in the link and in
+      this browser. Item icons are Satisfactory game assets © Coffee Stain Studios.
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

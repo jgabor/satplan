@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vite-plus/test";
-import { decodeState, emptyState, encodeState } from "../src/state.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { decodeState, emptyState, encodeState, readState, saveState } from "../src/state.ts";
 
 describe("state", () => {
   it("round trips every field", async () => {
@@ -61,5 +61,58 @@ describe("state", () => {
     const bytes = new TextEncoder().encode(json);
     const text = "j" + btoa(String.fromCharCode(...bytes)).replace(/=+$/, "");
     expect(await decodeState(text)).toEqual({ ...emptyState(), built: ["A"], rates: { B: 5 } });
+  });
+});
+
+describe("saved plan", () => {
+  const store = new Map<string, string>();
+  const stubPage = (search: string) => {
+    vi.stubGlobal("location", { href: `https://satplan.test/${search}`, hash: "" });
+    vi.stubGlobal("history", { replaceState: vi.fn() });
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+    });
+  };
+
+  beforeEach(() => store.clear());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("restores the saved plan when the link carries none", async () => {
+    stubPage("");
+    const state = { ...emptyState(), built: ["IronPlate"] };
+    await saveState(state);
+    expect(await readState()).toEqual(state);
+  });
+
+  it("prefers the link over the saved plan", async () => {
+    stubPage("");
+    await saveState({ ...emptyState(), built: ["IronPlate"] });
+    const linked = { ...emptyState(), built: ["Wire"] };
+    stubPage(`?s=${await encodeState(linked)}`);
+    expect(await readState()).toEqual(linked);
+  });
+
+  it("forgets the saved plan once the state is back to defaults", async () => {
+    stubPage("");
+    await saveState({ ...emptyState(), built: ["IronPlate"] });
+    await saveState(emptyState());
+    expect(store.size).toBe(0);
+  });
+
+  it("still works when storage throws", async () => {
+    stubPage("");
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {},
+    });
+    await expect(saveState({ ...emptyState(), built: ["IronPlate"] })).resolves.toBeUndefined();
+    expect(await readState()).toEqual(emptyState());
   });
 });

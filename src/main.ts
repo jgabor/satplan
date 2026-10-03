@@ -2,7 +2,7 @@ import "./style.css";
 import { METRICS, rankChains, type Metric } from "./calc.ts";
 import { catalog as cat } from "./catalog.ts";
 import { esc, renderList, type RowModel } from "./render.ts";
-import { buildUrl, readUrlState, saveUrlState, type State } from "./state.ts";
+import { buildUrl, readState, saveState, type State } from "./state.ts";
 import type { Extraction } from "./types.ts";
 
 const listedSet = new Set(cat.listed);
@@ -19,11 +19,15 @@ const linkBox = $<HTMLInputElement>("#link-box");
 const countEl = $<HTMLElement>("#count");
 const barEl = $<HTMLElement>("#bar");
 const statusEl = $<HTMLElement>("#status");
+const foldEl = $<HTMLButtonElement>("#fold");
+const optionsEl = $<HTMLButtonElement>("#options");
+const topEl = $<HTMLElement>(".top");
 
 let state: State;
 let openId: string | null = null;
 let query = "";
 let onlyTodo = false;
+const collapsed = new Set<string>();
 const cache = new Map<string, RowModel>();
 
 const chainKey = (ids: string[]) => [...ids].sort().join("|");
@@ -82,8 +86,13 @@ function render() {
   }
   statusEl.textContent = `${rows.length} of ${all.length} chains`;
 
+  // Matches inside a collapsed tier would be hidden, so a search shows every tier.
+  const searching = words.length > 0;
+  foldEl.hidden = searching;
+  foldEl.textContent = collapsed.size < cat.groups.length ? "Collapse all" : "Expand all";
+
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset.fk;
-  listEl.innerHTML = renderList(cat, rows, totals, openId);
+  listEl.innerHTML = renderList(cat, rows, totals, openId, searching ? new Set() : collapsed);
   if (focusKey && listEl.contains(document.activeElement) === false) {
     listEl.querySelector<HTMLElement>(`[data-fk="${CSS.escape(focusKey)}"]`)?.focus({
       preventScroll: true,
@@ -94,7 +103,7 @@ function render() {
 function commit(changed?: string) {
   if (changed) cache.delete(changed);
   else cache.clear();
-  saveUrlState(state);
+  void saveState(state);
   render();
 }
 
@@ -111,6 +120,19 @@ function setOpen(id: string | null) {
 
 listEl.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
+  const fold = target.closest<HTMLElement>("[data-fold]");
+  if (fold) {
+    const id = fold.dataset.fold!;
+    if (collapsed.delete(id)) {
+      render();
+    } else {
+      collapsed.add(id);
+      // An open row inside the tier would vanish while its hash stayed in the address bar.
+      if (openId && cat.items[openId].group === id) setOpen(null);
+      else render();
+    }
+    return;
+  }
   const toggle = target.closest<HTMLElement>("[data-toggle]");
   if (toggle) {
     const id = toggle.dataset.toggle!;
@@ -149,6 +171,21 @@ listEl.addEventListener("change", (event) => {
     else delete state.rates[id];
     commit(id);
   }
+});
+
+foldEl.addEventListener("click", () => {
+  if (collapsed.size < cat.groups.length) {
+    for (const group of cat.groups) collapsed.add(group.id);
+    setOpen(null);
+  } else {
+    collapsed.clear();
+    render();
+  }
+});
+
+optionsEl.addEventListener("click", () => {
+  const open = topEl.classList.toggle("options-open");
+  optionsEl.setAttribute("aria-expanded", String(open));
 });
 
 searchEl.addEventListener("input", () => {
@@ -208,7 +245,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function init() {
-  state = await readUrlState();
+  state = await readState();
   state.built = state.built.filter((id) => listedSet.has(id));
   minerEl.value = String(state.extraction.miner);
   purityEl.value = state.extraction.purity;

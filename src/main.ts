@@ -3,6 +3,7 @@ import { METRICS, rankChains, type Metric } from "./calc.ts";
 import { catalog as cat } from "./catalog.ts";
 import { esc, renderList, type RowModel } from "./render.ts";
 import { buildUrl, readUrlState, saveUrlState, type State } from "./state.ts";
+import type { Extraction } from "./types.ts";
 
 const listedSet = new Set(cat.listed);
 
@@ -10,6 +11,8 @@ const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>
 const listEl = $<HTMLDivElement>("#list");
 const searchEl = $<HTMLInputElement>("#q");
 const metricEl = $<HTMLSelectElement>("#metric");
+const minerEl = $<HTMLSelectElement>("#miner");
+const purityEl = $<HTMLSelectElement>("#purity");
 const todoEl = $<HTMLInputElement>("#todo");
 const copyEl = $<HTMLButtonElement>("#copy");
 const linkBox = $<HTMLInputElement>("#link-box");
@@ -33,7 +36,7 @@ function rowFor(id: string): RowModel {
   const customRate = id in state.rates;
   const rate = state.rates[id] ?? defaultRate;
   const saved = state.chosen[id];
-  const ranked = rankChains(cat, id, rate, state.metric, saved ? [saved] : []);
+  const ranked = rankChains(cat, id, rate, state.metric, saved ? [saved] : [], state.extraction);
   const match = saved ? ranked.find((r) => chainKey(r.ids) === chainKey(saved)) : undefined;
   const selected = match ?? ranked[0];
   const row: RowModel = {
@@ -158,6 +161,16 @@ metricEl.addEventListener("change", () => {
   commit();
 });
 
+minerEl.addEventListener("change", () => {
+  state.extraction.miner = Number(minerEl.value) as Extraction["miner"];
+  commit();
+});
+
+purityEl.addEventListener("change", () => {
+  state.extraction.purity = purityEl.value as Extraction["purity"];
+  commit();
+});
+
 todoEl.addEventListener("change", () => {
   onlyTodo = todoEl.checked;
   render();
@@ -197,6 +210,8 @@ document.addEventListener("keydown", (event) => {
 async function init() {
   state = await readUrlState();
   state.built = state.built.filter((id) => listedSet.has(id));
+  minerEl.value = String(state.extraction.miner);
+  purityEl.value = state.extraction.purity;
   metricEl.innerHTML = METRICS.map(
     (m) =>
       `<option value="${m.id}"${m.id === state.metric ? " selected" : ""}>${esc(m.label)}</option>`,

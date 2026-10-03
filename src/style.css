@@ -139,6 +139,15 @@ h1 {
   width: 100%;
 }
 
+#metric {
+  max-width: 100%;
+}
+
+.extraction {
+  display: flex;
+  gap: 8px;
+}
+
 .todo {
   display: flex;
   align-items: center;
@@ -220,6 +229,7 @@ footer {
   align-items: center;
   justify-content: center;
   width: 44px;
+  flex-shrink: 0;
   cursor: pointer;
 }
 
@@ -349,6 +359,7 @@ footer {
 
 table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -492,5 +503,62 @@ footer a {
   .alt {
     grid-template-columns: 1fr;
     gap: 2px;
+  }
+}
+
+@media (max-width: 560px) {
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .search,
+  #metric,
+  .extraction {
+    grid-column: 1 / -1;
+  }
+
+  .extraction {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters input[type="search"],
+  .filters select,
+  #copy,
+  .todo,
+  .rate-input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .main {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "name name rate"
+      "recipe recipe recipe"
+      "chips stages bldgs";
+  }
+
+  .name,
+  .recipe,
+  .alt {
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+
+  .chips {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .chip {
+    white-space: normal;
+  }
+}
+
+@media (max-height: 560px) {
+  .top {
+    position: static;
   }
 }

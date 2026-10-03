@@ -1,4 +1,6 @@
-import type { Catalog, ExtractorLine, Recipe, Result, Stage } from "./types.ts";
+import type { Catalog, Extraction, ExtractorLine, Recipe, Result, Stage } from "./types.ts";
+
+export const DEFAULT_EXTRACTION: Extraction = { miner: 2, purity: "pure" };
 
 const EPS = 1e-9;
 const MAX_ITERATIONS = 500;
@@ -24,6 +26,7 @@ export function evaluate(
   target: string,
   recipeIds: string[],
   rate: number,
+  extraction: Extraction = DEFAULT_EXTRACTION,
 ): Result | null {
   const assigned = new Map<string, Recipe>();
   for (const id of recipeIds) {
@@ -151,11 +154,24 @@ export function evaluate(
   for (const [item, info] of Object.entries(cat.raw)) {
     const perMin = (consume.get(item) ?? 0) - (supply.get(item) ?? 0);
     if (perMin <= EPS) continue;
+    const mined = info.building === "Miner Mk.2";
+    const well = info.building === "Well satellite (pure)";
+    const purity =
+      mined || well || info.building === "Oil Extractor" ? extraction.purity : undefined;
+    const purityFactor = purity === "impure" ? 0.25 : purity === "normal" ? 0.5 : 1;
+    const capacity = info.perMin * purityFactor * (mined ? 2 ** (extraction.miner - 2) : 1);
+    const count = countFor(perMin / capacity);
     extractors.push({
       item,
       perMin,
-      building: info.building,
-      count: Math.max(1, Math.ceil(perMin / info.perMin - EPS)),
+      building: mined
+        ? `Miner Mk.${extraction.miner}`
+        : well
+          ? `Well satellite (${purity})`
+          : info.building,
+      count,
+      clock: (perMin / (count * capacity)) * 100,
+      purity,
     });
   }
   extractors.sort((a, b) => a.item.localeCompare(b.item));
@@ -222,6 +238,7 @@ export function rankChains(
   rate: number,
   metric: Metric,
   extra: string[][] = [],
+  extraction: Extraction = DEFAULT_EXTRACTION,
 ): Ranked[] {
   const seen = new Set<string>();
   const ranked: Ranked[] = [];
@@ -229,7 +246,7 @@ export function rankChains(
     const key = [...ids].sort().join("|");
     if (seen.has(key)) continue;
     seen.add(key);
-    const result = evaluate(cat, item, ids, rate);
+    const result = evaluate(cat, item, ids, rate, extraction);
     if (result) ranked.push({ ids, result });
   }
   ranked.sort(

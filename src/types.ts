@@ -16,6 +16,11 @@ export type RawResource = {
   building: string;
 };
 
+export type Extraction = {
+  miner: 1 | 2 | 3;
+  purity: "impure" | "normal" | "pure";
+};
+
 export type ItemInfo = {
   name: string;
   fluid: boolean;
@@ -61,6 +66,8 @@ export type ExtractorLine = {
   perMin: number;
   building: string;
   count: number;
+  clock: number;
+  purity?: Extraction["purity"];
 };
 
 export type Result = {

@@ -1,7 +1,9 @@
-import type { Metric } from "./calc.ts";
+import { DEFAULT_EXTRACTION, type Metric } from "./calc.ts";
+import type { Extraction } from "./types.ts";
 
 export type State = {
   metric: Metric;
+  extraction: Extraction;
   /** Item ids marked as built. */
   built: string[];
   /** Item id to the recipe ids of the chain picked by the user. */
@@ -10,7 +12,13 @@ export type State = {
   rates: Record<string, number>;
 };
 
-export const emptyState = (): State => ({ metric: 0, built: [], chosen: {}, rates: {} });
+export const emptyState = (): State => ({
+  metric: 0,
+  extraction: { ...DEFAULT_EXTRACTION },
+  built: [],
+  chosen: {},
+  rates: {},
+});
 
 const VERSION = 1;
 // Prefix tells the decoder how the payload was packed, so links keep working
@@ -24,6 +32,7 @@ type Wire = {
   b?: string[];
   o?: Record<string, string[]>;
   r?: Record<string, number>;
+  e?: Partial<Extraction>;
 };
 
 function toWire(state: State): Wire {
@@ -32,6 +41,12 @@ function toWire(state: State): Wire {
   if (state.built.length) wire.b = [...state.built].sort();
   if (Object.keys(state.chosen).length) wire.o = state.chosen;
   if (Object.keys(state.rates).length) wire.r = state.rates;
+  const extraction: Partial<Extraction> = {};
+  if (state.extraction.miner !== DEFAULT_EXTRACTION.miner)
+    extraction.miner = state.extraction.miner;
+  if (state.extraction.purity !== DEFAULT_EXTRACTION.purity)
+    extraction.purity = state.extraction.purity;
+  if (Object.keys(extraction).length) wire.e = extraction;
   return wire;
 }
 
@@ -41,6 +56,9 @@ function fromWire(value: unknown): State {
   const wire = value as Partial<Wire>;
   if (wire.v !== VERSION) return state;
   if (wire.m === 1 || wire.m === 2) state.metric = wire.m;
+  if (wire.e?.miner === 1 || wire.e?.miner === 3) state.extraction.miner = wire.e.miner;
+  if (wire.e?.purity === "impure" || wire.e?.purity === "normal")
+    state.extraction.purity = wire.e.purity;
   if (Array.isArray(wire.b)) state.built = wire.b.filter((id) => typeof id === "string");
   if (wire.o && typeof wire.o === "object") {
     for (const [item, ids] of Object.entries(wire.o)) {

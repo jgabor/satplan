@@ -30,6 +30,20 @@
         /></label>
         <label class="sr" for="metric">Rank chains by</label>
         <select id="metric"></select>
+        <div class="extraction">
+          <label class="sr" for="miner">Miner level</label>
+          <select id="miner">
+            <option value="1">Miner Mk.1</option>
+            <option value="2" selected>Miner Mk.2</option>
+            <option value="3">Miner Mk.3</option>
+          </select>
+          <label class="sr" for="purity">Node purity</label>
+          <select id="purity">
+            <option value="impure">Impure nodes</option>
+            <option value="normal">Normal nodes</option>
+            <option value="pure" selected>Pure nodes</option>
+          </select>
+        </div>
         <label class="todo"><input id="todo" type="checkbox" /> To build</label>
         <button id="copy" type="button">Copy link</button>
       </div>
@@ -45,8 +59,7 @@
         href="https://github.com/satisfactory-factories/application/blob/main/parsing/gameData.json"
         >Satisfactory Factories</a
       >
-      (<span id="source"></span>). Pure Mk.2 miners 240/min, oil extractors 240 m³/min, water
-      extractors 120 m³/min. All state is in the link.
+      (<span id="source"></span>). Water extractors 120 m³/min. All state is in the link.
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -5,6 +5,7 @@ describe("state", () => {
   it("round trips every field", async () => {
     const state = {
       metric: 2 as const,
+      extraction: { miner: 3 as const, purity: "normal" as const },
       built: ["IronScrew", "Computer"],
       chosen: { Computer: ["Computer", "Plastic"] },
       rates: { IronScrew: 120 },
@@ -18,6 +19,30 @@ describe("state", () => {
     expect(text.length).toBeLessThan(20);
     expect(await decodeState(text)).toEqual(emptyState());
   });
+
+  it.each(["miner", "purity"] as const)("round trips a changed %s on its own", async (field) => {
+    const state = emptyState();
+    if (field === "miner") state.extraction.miner = 1;
+    else state.extraction.purity = "impure";
+    expect(await decodeState(await encodeState(state))).toEqual(state);
+  });
+
+  it("reads existing links with default extraction settings", async () => {
+    const text = "j" + btoa(JSON.stringify({ v: 1, b: ["IronScrew"], r: { IronScrew: 120 } }));
+    expect(await decodeState(text)).toEqual({
+      ...emptyState(),
+      built: ["IronScrew"],
+      rates: { IronScrew: 120 },
+    });
+  });
+
+  it.each([{ miner: 0, purity: "rich" }, { miner: "3", purity: null }, null])(
+    "ignores invalid extraction settings: %j",
+    async (extraction) => {
+      const text = "j" + btoa(JSON.stringify({ v: 1, e: extraction }));
+      expect(await decodeState(text)).toEqual(emptyState());
+    },
+  );
 
   it("uses only URL-safe characters", async () => {
     const built = Array.from({ length: 90 }, (_, i) => `Item${i}`);

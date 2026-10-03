@@ -83,15 +83,14 @@ function renderStages(cat: Catalog, result: Result): string {
   let step = 0;
   const rows: string[] = [];
   for (const e of result.extractors) {
-    const clock = (e.perMin / (e.count * cat.raw[e.item].perMin)) * 100;
     rows.push(`<tr class="extract">
       <td class="num">${++step}</td>
       <td class="num">${e.count}×</td>
       <td>${esc(buildingName(cat, e.building))}</td>
-      <td>${esc(itemName(cat, e.item))} <small>pure node</small></td>
+      <td>${esc(itemName(cat, e.item))}${e.purity ? ` (${e.purity})` : ""}</td>
       <td></td>
       <td class="num">${flows(cat, [[e.item, e.perMin]])}</td>
-      <td class="num">${fmt(clock)}%</td></tr>`);
+      <td class="num">${fmt(e.clock)}%</td></tr>`);
   }
   for (const s of result.stages) {
     rows.push(`<tr class="${s.kind}">

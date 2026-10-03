@@ -1,9 +1,77 @@
 import { describe, expect, it } from "vite-plus/test";
 import { evaluate, rankChains } from "../src/calc.ts";
 import { catalog as cat } from "../src/catalog.ts";
-import type { Catalog } from "../src/types.ts";
+import type { Catalog, Extraction } from "../src/types.ts";
 
 describe("evaluate", () => {
+  it.each([
+    [1, "impure", 30],
+    [1, "normal", 60],
+    [1, "pure", 120],
+    [2, "impure", 60],
+    [2, "normal", 120],
+    [2, "pure", 240],
+    [3, "impure", 120],
+    [3, "normal", 240],
+    [3, "pure", 480],
+  ] as const)("sizes Mk.%i miners on %s nodes at %i/min", (miner, purity, capacity) => {
+    const result = evaluate(cat, "IronIngot", ["IngotIron"], 250, { miner, purity })!;
+    const extractor = result.extractors[0];
+    const count = Math.ceil(250 / capacity);
+    expect(extractor).toEqual({
+      item: "OreIron",
+      perMin: expect.closeTo(250, 6),
+      building: `Miner Mk.${miner}`,
+      count,
+      clock: expect.closeTo((250 / (count * capacity)) * 100, 6),
+      purity,
+    });
+    expect(Object.fromEntries(result.totals)[`Miner Mk.${miner}`]).toBe(count);
+    expect(result.buildings).toBe(count + 9);
+    expect(result.stages[0].runs).toBeCloseTo(250 / 30);
+  });
+
+  it.each(["impure", "normal", "pure"] as const)(
+    "applies %s purity to oil without applying the miner level",
+    (purity) => {
+      const result = evaluate(cat, "Plastic", ["Plastic"], 160, { miner: 1, purity })!;
+      const capacity = { impure: 60, normal: 120, pure: 240 }[purity];
+      expect(result.extractors[0]).toEqual({
+        item: "LiquidOil",
+        perMin: 240,
+        building: "Oil Extractor",
+        count: 240 / capacity,
+        clock: 100,
+        purity,
+      });
+    },
+  );
+
+  it("changes nitrogen satellite capacity but leaves water extraction unchanged", () => {
+    const chain = ["NitricAcid", "IronPlate", "IngotIron"];
+    const baseline = evaluate(cat, "NitricAcid", chain, 100)!;
+    const result = evaluate(cat, "NitricAcid", chain, 100, { miner: 3, purity: "normal" })!;
+    const nitrogen = result.extractors.find((e) => e.item === "NitrogenGas")!;
+    expect(nitrogen.building).toBe("Well satellite (normal)");
+    expect(nitrogen.count).toBe(Math.ceil(nitrogen.perMin / 60));
+    expect(nitrogen.clock).toBeCloseTo((nitrogen.perMin / (nitrogen.count * 60)) * 100);
+    expect(result.extractors.find((e) => e.item === "Water")).toEqual(
+      baseline.extractors.find((e) => e.item === "Water"),
+    );
+    expect(result.extractors.find((e) => e.item === "Water")).toBeDefined();
+  });
+
+  it("uses extraction settings when ranking chains", () => {
+    const extraction: Extraction = { miner: 1, purity: "impure" };
+    const ranked = rankChains(cat, "IronIngot", 250, 1, [["IngotIron"]], extraction);
+    const standard = ranked.find((r) => r.ids.length === 1 && r.ids[0] === "IngotIron")!;
+    expect(standard.result).toEqual(evaluate(cat, "IronIngot", ["IngotIron"], 250, extraction));
+    expect(standard.result.extractors[0].count).toBe(9);
+    for (let i = 1; i < ranked.length; i++) {
+      expect(ranked[i].result.buildings).toBeGreaterThanOrEqual(ranked[i - 1].result.buildings);
+    }
+  });
+
   it("matches the known stitched reinforced iron plate chain", () => {
     const chain = ["Alternate_ReinforcedIronPlate_2", "Alternate_Wire_1", "IronPlate", "IngotIron"];
     const result = evaluate(cat, "IronPlateReinforced", chain, 5.625)!;

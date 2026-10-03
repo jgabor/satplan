@@ -1,8 +1,8 @@
 # satplan
 
-A small static site that lists self-contained Satisfactory production chains, one per storable part, with building counts and flow rates. It assumes pure nodes, free raw extraction and all alternate recipes unlocked.
+A small static site that lists self-contained Satisfactory production chains, one per storable part, with building counts and flow rates. It defaults to pure nodes and Mk.2 miners, with free raw extraction and all alternate recipes unlocked.
 
-All state lives in the URL (`?s=…`): built items, ranking metric, custom rates and chosen chains. `#ItemId` opens one item.
+All state lives in the URL (`?s=…`): built items, ranking metric, miner level, node purity, custom rates and chosen chains. `#ItemId` opens one item.
 
 ## Develop
 
@@ -43,8 +43,9 @@ How the catalog is built:
 
 ### Assumptions to know about
 
-- Pure Mk.2 miners give 240/min, oil extractors 240 m³/min, water extractors 120 m³/min.
-- Nitrogen uses one pure well satellite (120 m³/min each). The pressurizer is not counted.
+- Miner level (Mk.1, Mk.2 or Mk.3) and node purity (impure, normal or pure) apply to all chains. The defaults are Mk.2 and pure, giving 240/min per miner at 100% clock.
+- Node purity also applies to oil extractors (240 m³/min on pure nodes) and nitrogen well satellites (120 m³/min on pure satellites). Normal nodes give half the pure rate; impure nodes give one quarter. Water extractors stay at 120 m³/min. The nitrogen pressurizer is not counted.
+- Extractor counts use 100% clock capacity, then share the load at the displayed clock speed. Overclocking and belt limits are not modeled.
 - The default target for each item is one building at 100% in the top-ranked chain. Changing the ranking metric does not change the default target.
 
 ## Hooks

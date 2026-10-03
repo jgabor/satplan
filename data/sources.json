@@ -4,5 +4,6 @@
   "files": {
     "gameData": "parsing/gameData.json",
     "gameDocs": "parsing/game-docs.json"
-  }
+  },
+  "icons": "web/public/assets/game/item"
 }

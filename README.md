@@ -32,6 +32,8 @@ vp run catalog:fetch    # downloads the pinned files again
 
 To update the data, change `sha` in `data/sources.json` and run `catalog:fetch`.
 
+Item icons are 64px PNGs from the same repo (`web/public/assets/game/item/`, pinned by the same `sha`; the repo collated them from [SatisfactoryTools](https://github.com/greeny/SatisfactoryTools)). They are Satisfactory game assets, © Coffee Stain Studios. `public/icons/<ItemId>.png` is committed, so builds need no network. After the catalog gains items or `sha` changes, run `vp run icons`; the test in `tests/icons.test.ts` fails when an icon is missing.
+
 How the catalog is built:
 
 - Only recipes that can run from extractable raw inputs are kept. FICSMAS recipes, resource conversions, and anything that needs leaves, wood, mycelia, creature parts or power slugs are dropped.

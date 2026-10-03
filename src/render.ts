@@ -36,6 +36,10 @@ export function fmt(n: number): string {
 const itemName = (cat: Catalog, id: string) => cat.items[id]?.name ?? cat.raw[id]?.name ?? id;
 const buildingName = (cat: Catalog, id: string) => cat.buildings[id] ?? id;
 
+/** Item icon, sized by CSS. Files live in public/icons and are named by item id. */
+const icon = (id: string, size: "lg" | "sm") =>
+  `<img class="ico ico-${size}" src="/icons/${esc(id)}.png" alt="" width="${size === "lg" ? 28 : 16}" height="${size === "lg" ? 28 : 16}" loading="lazy" decoding="async">`;
+
 function recipeLabel(recipe: Recipe): string {
   return esc(recipe.name) + (recipe.alt ? ' <span class="tag">alt</span>' : "");
 }
@@ -46,7 +50,7 @@ function finalRecipe(row: Pick<RowModel, "id" | "selected">): Recipe {
 
 function rawChips(cat: Catalog, result: Result): string {
   return result.extractors
-    .map((e) => `<span class="chip">${esc(itemName(cat, e.item))}</span>`)
+    .map((e) => `<span class="chip">${icon(e.item, "sm")}${esc(itemName(cat, e.item))}</span>`)
     .join("");
 }
 
@@ -58,6 +62,7 @@ function renderRow(cat: Catalog, row: RowModel, open: boolean): string {
   <div class="row">
     <label class="check"><input type="checkbox" class="built-box" data-id="${id}" data-fk="built:${id}"${row.built ? " checked" : ""} aria-label="Mark ${esc(row.name)} as built"></label>
     <button type="button" class="main" data-toggle="${id}" data-fk="toggle:${id}" aria-expanded="${open}">
+      ${icon(row.id, "lg")}
       <span class="name">${esc(row.name)}</span>
       <span class="recipe">${recipeLabel(finalRecipe(row))}${row.pinned ? ' <span class="tag pin">picked</span>' : ""}</span>
       <span class="num rate">${fmt(row.rate)}/min</span>
@@ -74,7 +79,7 @@ function flows(cat: Catalog, list: [string, number, ("main" | "by")?][]): string
   return list
     .map(
       ([item, perMin, kind]) =>
-        `<div class="${kind === "by" ? "by" : ""}">${fmt(perMin)} ${esc(itemName(cat, item))}${kind === "by" ? " <small>byproduct</small>" : ""}</div>`,
+        `<div class="${kind === "by" ? "by" : ""}">${fmt(perMin)} ${icon(item, "sm")}${esc(itemName(cat, item))}${kind === "by" ? " <small>byproduct</small>" : ""}</div>`,
     )
     .join("");
 }
@@ -87,7 +92,7 @@ function renderStages(cat: Catalog, result: Result): string {
       <td class="num">${++step}</td>
       <td class="num">${e.count}×</td>
       <td>${esc(buildingName(cat, e.building))}</td>
-      <td>${esc(itemName(cat, e.item))}${e.purity ? ` (${e.purity})` : ""}</td>
+      <td>${icon(e.item, "sm")}${esc(itemName(cat, e.item))}${e.purity ? ` (${e.purity})` : ""}</td>
       <td></td>
       <td class="num">${flows(cat, [[e.item, e.perMin]])}</td>
       <td class="num">${fmt(e.clock)}%</td></tr>`);

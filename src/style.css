@@ -25,6 +25,12 @@
   box-sizing: border-box;
 }
 
+/* The list makes the page scroll once it renders. Without a reserved gutter the scrollbar
+   narrows the viewport and everything centred on the page moves sideways. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -135,6 +141,7 @@ h1 {
 }
 
 .count {
+  min-width: 6.5em;
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
@@ -175,15 +182,22 @@ h1 {
 }
 
 .search {
-  flex: 1 1 260px;
+  flex: 1 1 220px;
 }
 
 .search input {
   width: 100%;
 }
 
+/* These two are filled in by script. Reserving their width keeps the controls beside them
+   from moving when the options arrive. */
 #metric {
+  min-width: min(17.5em, 100%);
   max-width: 100%;
+}
+
+#tier {
+  min-width: min(8em, 100%);
 }
 
 .extraction {
@@ -619,6 +633,11 @@ h3 small {
   padding: 24px 0;
   color: var(--muted);
   text-align: center;
+}
+
+/* The footer sits right under an empty page until the list renders and pushes it away. */
+body:not(.ready) footer {
+  visibility: hidden;
 }
 
 footer {

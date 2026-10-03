@@ -282,6 +282,7 @@ async function init() {
   const hash = decodeURIComponent(location.hash.slice(1));
   if (listedSet.has(hash)) openId = hash;
   render();
+  document.body.classList.add("ready");
   if (openId) document.getElementById(`item-${openId}`)?.scrollIntoView({ block: "start" });
 }
 

@@ -1,8 +1,8 @@
 import "./style.css";
-import { METRICS, rankChains, recipeTiers, type Metric } from "./calc.ts";
+import { METRICS, rankChains, recipeTiers, stepRate, wholeBuildings, type Metric } from "./calc.ts";
 import { catalog as cat } from "./catalog.ts";
-import { esc, renderList, type RowModel } from "./render.ts";
-import { buildUrl, readState, saveState, type State } from "./state.ts";
+import { esc, finalBase, renderList, type RowModel } from "./render.ts";
+import { readState, saveState, type State } from "./state.ts";
 import type { Extraction } from "./types.ts";
 
 const listedSet = new Set(cat.listed);
@@ -15,8 +15,6 @@ const minerEl = $<HTMLSelectElement>("#miner");
 const purityEl = $<HTMLSelectElement>("#purity");
 const tierEl = $<HTMLSelectElement>("#tier");
 const todoEl = $<HTMLInputElement>("#todo");
-const copyEl = $<HTMLButtonElement>("#copy");
-const linkBox = $<HTMLInputElement>("#link-box");
 const countEl = $<HTMLElement>("#count");
 const barEl = $<HTMLElement>("#bar");
 const statusEl = $<HTMLElement>("#status");
@@ -29,6 +27,8 @@ let openId: string | null = null;
 let query = "";
 let onlyTodo = false;
 const collapsed = new Set<string>();
+// Item id to the rate control the user picked. Items without an entry follow their saved rate.
+const exactMode = new Map<string, boolean>();
 // A null entry means no chain is unlocked at the chosen tier.
 const cache = new Map<string, RowModel | null>();
 
@@ -69,6 +69,7 @@ function rowFor(id: string): RowModel | null {
     selected,
     pinned: !!match && match !== ranked[0],
     stale: !!saved && !match,
+    exact: exactMode.get(id) ?? (customRate && !wholeBuildings(rate, finalBase({ id, selected }))),
   };
   cache.set(id, row);
   return row;
@@ -121,6 +122,12 @@ function commit(changed?: string) {
   render();
 }
 
+function setRate(id: string, value: number) {
+  if (Number.isFinite(value) && value > 0 && value !== cat.ref[id]) state.rates[id] = value;
+  else delete state.rates[id];
+  commit(id);
+}
+
 function setOpen(id: string | null) {
   openId = id;
   history.replaceState(
@@ -163,6 +170,22 @@ listEl.addEventListener("click", (event) => {
     commit(id);
     return;
   }
+  const step = target.closest<HTMLElement>("[data-step]");
+  if (step) {
+    const id = step.dataset.id!;
+    const row = rowFor(id)!;
+    const next = stepRate(row.rate, finalBase(row), Number(step.dataset.step) > 0 ? 1 : -1);
+    if (next !== null) setRate(id, next);
+    return;
+  }
+  const mode = target.closest<HTMLElement>("[data-mode]");
+  if (mode) {
+    const id = mode.dataset.id!;
+    exactMode.set(id, mode.dataset.mode === "exact");
+    cache.delete(id);
+    render();
+    return;
+  }
   const reset = target.closest<HTMLElement>("[data-reset-rate]");
   if (reset) {
     const id = reset.dataset.resetRate!;
@@ -180,10 +203,7 @@ listEl.addEventListener("change", (event) => {
     state.built = target.checked ? [...state.built, id] : state.built.filter((b) => b !== id);
     commit(id);
   } else if (target.classList.contains("rate-input")) {
-    const value = Number(target.value);
-    if (Number.isFinite(value) && value > 0 && value !== cat.ref[id]) state.rates[id] = value;
-    else delete state.rates[id];
-    commit(id);
+    setRate(id, Number(target.value));
   }
 });
 
@@ -230,20 +250,6 @@ purityEl.addEventListener("change", () => {
 todoEl.addEventListener("change", () => {
   onlyTodo = todoEl.checked;
   render();
-});
-
-copyEl.addEventListener("click", async () => {
-  const url = await buildUrl(state, openId ? `#${encodeURIComponent(openId)}` : "");
-  try {
-    await navigator.clipboard.writeText(url);
-    copyEl.textContent = "Copied";
-    setTimeout(() => (copyEl.textContent = "Copy link"), 1500);
-  } catch {
-    // Some embedded browsers block clipboard access, so offer the text to copy by hand.
-    linkBox.value = url;
-    linkBox.hidden = false;
-    linkBox.select();
-  }
 });
 
 document.addEventListener("keydown", (event) => {

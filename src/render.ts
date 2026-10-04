@@ -1,4 +1,4 @@
-import type { Ranked } from "./calc.ts";
+import { stepRate, type Ranked } from "./calc.ts";
 import type { Catalog, Recipe, Result } from "./types.ts";
 
 export type RowModel = {
@@ -15,6 +15,8 @@ export type RowModel = {
   pinned: boolean;
   /** True when a saved choice no longer matches any known chain. */
   stale: boolean;
+  /** True when the detail view offers the exact rate field instead of building steps. */
+  exact: boolean;
 };
 
 const ESCAPES: Record<string, string> = {
@@ -47,6 +49,9 @@ function recipeLabel(recipe: Recipe): string {
 function finalRecipe(row: Pick<RowModel, "id" | "selected">): Recipe {
   return row.selected.result.stages.find((s) => s.kind === "make" && s.item === row.id)!.recipe;
 }
+
+/** What one final-stage building makes per minute at 100% clock. */
+export const finalBase = (row: Pick<RowModel, "id" | "selected">) => finalRecipe(row).outs[0][1];
 
 function rawChips(cat: Catalog, result: Result): string {
   return result.extractors
@@ -119,6 +124,18 @@ function renderDetail(cat: Catalog, row: RowModel): string {
   const result = row.selected.result;
   const id = esc(row.id);
   const final = result.stages.find((s) => s.kind === "make" && s.item === row.id)!;
+  const building = esc(buildingName(cat, final.recipe.building));
+  const rateControl = row.exact
+    ? `<label class="rate-field">Target <input type="number" class="rate-input" data-id="${id}" data-fk="rate:${id}" min="0" step="any" value="${row.rate}" inputmode="decimal"> /min</label>`
+    : `<span class="stepper" role="group" aria-label="Final stage buildings">
+      <button type="button" class="step" data-step="-1" data-id="${id}" data-fk="step:${id}:-1" aria-label="One fewer ${building}"${stepRate(row.rate, finalBase(row), -1) === null ? " disabled" : ""}>−</button>
+      <span class="step-count num">${fmt(final.count)}× ${building}</span>
+      <button type="button" class="step" data-step="1" data-id="${id}" data-fk="step:${id}:1" aria-label="One more ${building}">+</button>
+    </span>`;
+  const rateNote = row.exact
+    ? `${fmt(final.count)}× ${building} at ${fmt(final.clock)}% for the final stage`
+    : `${fmt(row.rate)}/min, final stage at ${fmt(final.clock)}%`;
+  const modeToggle = `<button type="button" class="link" data-mode="${row.exact ? "steps" : "exact"}" data-id="${id}" data-fk="mode:${id}">${row.exact ? "Building steps" : "Exact rate"}</button>`;
   const totals = result.totals
     .map(([b, n]) => `<span class="chip total"><b>${n}×</b> ${esc(buildingName(cat, b))}</span>`)
     .join("");
@@ -135,7 +152,9 @@ function renderDetail(cat: Catalog, row: RowModel): string {
       const isSelected = r === row.selected;
       const raws = r.result.extractors.map((e) => esc(itemName(cat, e.item))).join(", ");
       return `<button type="button" class="alt${isSelected ? " selected" : ""}" data-pick="${id}" data-index="${index}" data-fk="pick:${id}:${index}" aria-pressed="${isSelected}">
-        <span class="alt-stats num">${r.result.stageCount} stages · ${r.result.buildings} bldgs · ${fmt(r.result.power)} MW</span>
+        <span class="num">${r.result.stageCount}<span class="sr"> stages</span></span>
+        <span class="num">${r.result.buildings}<span class="sr"> buildings</span></span>
+        <span class="num">${fmt(r.result.power)} MW</span>
         <span class="alt-raw">${raws}${r.result.unresolved.length ? ' · <span class="warn">stuck byproduct</span>' : ""}</span>
         <span class="alt-names">${index === 0 ? '<span class="tag">best</span> ' : ""}${names}</span>
       </button>`;
@@ -144,15 +163,17 @@ function renderDetail(cat: Catalog, row: RowModel): string {
   return `
 <div class="detail">
   <div class="controls">
-    <label class="rate-field">Target <input type="number" class="rate-input" data-id="${id}" data-fk="rate:${id}" min="0" step="any" value="${row.rate}" inputmode="decimal"> /min</label>
-    <span class="note">${fmt(final.count)}× ${esc(buildingName(cat, final.recipe.building))} at ${fmt(final.clock)}% for the final stage</span>
+    ${rateControl}
+    ${modeToggle}
     ${row.customRate ? `<button type="button" class="link" data-reset-rate="${id}" data-fk="reset:${id}">Reset to ${fmt(row.defaultRate)}/min</button>` : `<span class="note dim">Default: one building at 100%</span>`}
+    <span class="note rate-note">${rateNote}</span>
   </div>
   <div class="totals">${totals}${power}</div>
   ${renderStages(cat, result)}
   ${sinks ? `<p class="sink">Send to an AWESOME Sink: ${sinks}</p>` : ""}
   ${row.stale ? '<p class="warn">Your saved chain is no longer available. Showing the best chain.</p>' : ""}
   <h3>Chains <small>${row.ranked.length}, best first</small></h3>
+  <div class="alts-head" aria-hidden="true"><span>Stages</span><span>Buildings</span><span>Power draw</span></div>
   <div class="alts">${alternatives}</div>
 </div>`;
 }

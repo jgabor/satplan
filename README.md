@@ -55,6 +55,7 @@ How the catalog is built:
 - Node purity also applies to oil extractors (240 m³/min on pure nodes) and nitrogen well satellites (120 m³/min on pure satellites). Normal nodes give half the pure rate; impure nodes give one quarter. Water extractors stay at 120 m³/min. The nitrogen pressurizer is not counted.
 - Extractor counts use 100% clock capacity, then share the load at the displayed clock speed. Overclocking and belt limits are not modeled.
 - The default target for each item is one building at 100% in the top-ranked chain. Changing the ranking metric does not change the default target.
+- The item detail has two ways to set the target. The default `−`/`+` stepper moves the final stage by whole buildings (1× to 2× Constructor); a part-filled final stage rounds to a whole building on the first step. The "Exact rate" toggle swaps the stepper for a numeric `Target` field. An item opens in exact mode when its saved rate is not a whole number of final-stage buildings.
 
 ## Hooks
 

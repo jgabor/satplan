@@ -142,7 +142,7 @@ export function readState(): Promise<State> {
   return decodeState(fromUrl ?? saved);
 }
 
-export async function buildUrl(state: State, hash = location.hash): Promise<string> {
+async function buildUrl(state: State, hash = location.hash): Promise<string> {
   const url = new URL(location.href);
   const wire = toWire(state);
   if (Object.keys(wire).length > 1) url.searchParams.set(PARAM, await encodeState(state));

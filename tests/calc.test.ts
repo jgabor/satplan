@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { evaluate, rankChains, recipeTiers } from "../src/calc.ts";
+import { evaluate, rankChains, recipeTiers, stepRate, wholeBuildings } from "../src/calc.ts";
 import { catalog as cat } from "../src/catalog.ts";
 import type { Catalog, Extraction } from "../src/types.ts";
 
@@ -247,6 +247,38 @@ describe("tier filter", () => {
     // The tutorial unlocks the recipe before the Assembler (tier 2) can be built.
     expect(cat.recipes.IronPlateReinforced.tier).toBe(2);
     expect(cat.recipes.IngotIron.tier).toBe(0);
+  });
+});
+
+describe("stepRate", () => {
+  it("adds and removes whole buildings", () => {
+    expect(stepRate(30, 30, 1)).toBe(60);
+    expect(stepRate(60, 30, -1)).toBe(30);
+    expect(stepRate(120, 30, -1)).toBe(90);
+  });
+
+  it("stops at one building", () => {
+    expect(stepRate(30, 30, -1)).toBeNull();
+    expect(stepRate(15, 30, -1)).toBeNull();
+  });
+
+  it("rounds a part-filled building to a whole one", () => {
+    expect(stepRate(15, 30, 1)).toBe(30);
+    expect(stepRate(45, 30, 1)).toBe(60);
+    expect(stepRate(45, 30, -1)).toBe(30);
+  });
+
+  it("ignores float noise in the current rate", () => {
+    const base = 0.1;
+    const rate = base * 3;
+    expect(stepRate(rate, base, 1)).toBeCloseTo(0.4, 12);
+    expect(stepRate(rate, base, -1)).toBeCloseTo(0.2, 12);
+  });
+
+  it("recognises whole building counts", () => {
+    expect(wholeBuildings(90, 30)).toBe(true);
+    expect(wholeBuildings(0.1 * 3, 0.1)).toBe(true);
+    expect(wholeBuildings(45, 30)).toBe(false);
   });
 });
 

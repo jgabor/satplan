@@ -221,6 +221,21 @@ function activeRecipes(cat: Catalog, assigned: Map<string, Recipe>, runs: Map<st
   return list;
 }
 
+/** True when `rate` is a whole number of final-stage buildings at 100% clock. */
+export const wholeBuildings = (rate: number, base: number) =>
+  Math.abs(rate / base - Math.round(rate / base)) < 1e-6;
+
+/**
+ * The target rate after adding or removing one final-stage building. `base` is what one
+ * building makes per minute at 100%. A part-filled building counts as one, so stepping up
+ * from 1.5 buildings gives 2 and stepping down gives 1. Returns null below one building.
+ */
+export function stepRate(rate: number, base: number, direction: 1 | -1): number | null {
+  const n = rate / base;
+  const whole = direction > 0 ? Math.floor(n + EPS) + 1 : Math.ceil(n - EPS) - 1;
+  return whole < 1 ? null : whole * base;
+}
+
 export type Metric = 0 | 1 | 2 | 3;
 
 export const METRICS: { id: Metric; label: string }[] = [

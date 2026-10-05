@@ -32,10 +32,12 @@
           ><input
             id="q"
             type="search"
-            placeholder="Search item, recipe or input ( / )"
+            placeholder="Search item, recipe or input"
             autocomplete="off"
             spellcheck="false"
-        /></label>
+            aria-keyshortcuts="/"
+          /><kbd class="key" aria-hidden="true">/</kbd></label
+        >
         <div id="settings" class="settings">
           <label class="sr" for="metric">Rank chains by</label>
           <select id="metric"></select>

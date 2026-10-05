@@ -182,11 +182,38 @@ h1 {
 }
 
 .search {
+  position: relative;
   flex: 1 1 220px;
 }
 
 .search input {
   width: 100%;
+  padding-right: 32px;
+}
+
+/* Shortcut hint for the "/" key. It gives way to typed text and the browser's clear button. */
+.key {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  font: 700 11px/16px var(--display);
+  color: var(--muted);
+  text-align: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.search input:not(:placeholder-shown) + .key {
+  display: none;
+}
+
+@media (hover: none) {
+  .key {
+    display: none;
+  }
 }
 
 /* These two are filled in by script. Reserving their width keeps the controls beside them
@@ -338,8 +365,32 @@ footer {
   transform: rotate(-45deg);
 }
 
-.fold-head .num {
+/* Per-tier progress, segmented like the bar in the header. */
+.gauge {
+  position: relative;
+  width: 64px;
+  height: 6px;
   margin-left: auto;
+  background: var(--line);
+}
+
+.gauge::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 6px, var(--panel-2) 6px 8px);
+}
+
+.gauge > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.fold-head .num {
+  min-width: 3.2em;
+  margin-left: 4px;
+  text-align: right;
   color: var(--muted);
   font-weight: 400;
   font-size: 12px;
@@ -374,7 +425,8 @@ footer {
   height: 22px;
 }
 
-.main {
+.main,
+.list-cols {
   flex: 1;
   min-width: 0;
   display: grid;
@@ -388,6 +440,41 @@ footer {
   background: none;
   border: 0;
   text-align: left;
+}
+
+/* One row of column labels per open tier. The rows then drop their own unit labels. */
+.list-head {
+  display: flex;
+  border-top: 1px solid var(--line);
+}
+
+.list-head::before {
+  content: "";
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.list-cols {
+  padding-block: 5px;
+  font: 700 11px/1.4 var(--display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.list-cols .r {
+  text-align: right;
+}
+
+@media (min-width: 861px) {
+  .unit {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 
 .item:hover .main,
@@ -606,6 +693,25 @@ td.num:nth-child(6) {
   white-space: normal;
 }
 
+/* Clock gauge under the percentage. Full-clock stages stay grey so underclocking stands out. */
+.clock-bar {
+  display: block;
+  width: 44px;
+  height: 3px;
+  margin-top: 3px;
+  background: var(--panel-2);
+}
+
+.clock-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--line-strong);
+}
+
+.clock-bar.under > span {
+  background: var(--accent);
+}
+
 .sink {
   margin: 8px 0 0;
   font-size: 12px;
@@ -636,7 +742,7 @@ h3 small {
 .alts-head,
 .alt {
   display: grid;
-  grid-template-columns: 52px 72px 84px minmax(110px, 0.7fr) 1.6fr;
+  grid-template-columns: 72px 92px 128px minmax(110px, 0.7fr) 1.6fr;
   gap: 8px;
   align-items: baseline;
 }
@@ -673,6 +779,19 @@ h3 small {
   color: var(--muted);
 }
 
+/* Difference from the selected chain. Lower is better in every column. */
+.delta.same {
+  color: var(--line-strong);
+}
+
+.delta.worse {
+  color: var(--warn);
+}
+
+.delta.better {
+  color: var(--text);
+}
+
 .empty {
   padding: 24px 0;
   color: var(--muted);
@@ -695,6 +814,10 @@ footer a {
 }
 
 @media (max-width: 860px) {
+  .list-head {
+    display: none;
+  }
+
   .main {
     grid-template-columns: 40px 1fr 84px 70px 66px 76px;
     grid-template-areas:
@@ -747,7 +870,7 @@ footer a {
 
   .alts-head,
   .alt {
-    grid-template-columns: 52px 72px 1fr;
+    grid-template-columns: 72px 92px 1fr;
   }
 
   .alt {

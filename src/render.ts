@@ -42,6 +42,24 @@ const buildingName = (cat: Catalog, id: string) => cat.buildings[id] ?? id;
 const icon = (id: string, size: "lg" | "sm") =>
   `<img class="ico ico-${size}" src="/icons/${esc(id)}.png" alt="" width="${size === "lg" ? 28 : 16}" height="${size === "lg" ? 28 : 16}" loading="lazy" decoding="async">`;
 
+/** Clock speed with a small gauge. Underclocked stages get the accent colour. */
+const clock = (pct: number) =>
+  `${fmt(pct)}%<span class="clock-bar${pct < 99.95 ? " under" : ""}" aria-hidden="true"><span style="width:${Math.min(pct, 100)}%"></span></span>`;
+
+/** Signed difference from the selected chain. Lower is better for every column. */
+function delta(diff: number, format: (n: number) => string = String): string {
+  const same = Math.abs(diff) < 0.005;
+  const kind = same ? "same" : diff > 0 ? "worse" : "better";
+  const text = same ? "±0" : `${diff > 0 ? "+" : "−"}${format(Math.abs(diff))}`;
+  return ` <span class="delta ${kind}"><span class="sr">, </span>${text}<span class="sr"> compared with the selected chain</span></span>`;
+}
+
+/** Column labels for the rows of an open tier. Wide screens only; see style.css. */
+const LIST_HEAD = `<div class="list-head" aria-hidden="true"><span class="list-cols">
+  <span></span><span>Item</span><span>Final recipe</span><span class="r">Rate /min</span>
+  <span class="r">Stages</span><span class="r">Bldgs</span><span class="r">MW</span><span>Raw inputs</span>
+</span></div>`;
+
 function recipeLabel(recipe: Recipe): string {
   return esc(recipe.name) + (recipe.alt ? ' <span class="tag">alt</span>' : "");
 }
@@ -71,9 +89,9 @@ function renderRow(cat: Catalog, row: RowModel, open: boolean): string {
       <span class="name">${esc(row.name)}</span>
       <span class="recipe">${recipeLabel(finalRecipe(row))}${row.pinned ? ' <span class="tag pin">picked</span>' : ""}</span>
       <span class="num rate">${fmt(row.rate)}/min</span>
-      <span class="num stat stages">${result.stageCount} <small>stages</small></span>
-      <span class="num stat bldgs">${result.buildings} <small>bldgs</small></span>
-      <span class="num stat power">${fmt(result.power)} <small>MW</small></span>
+      <span class="num stat stages">${result.stageCount} <small class="unit">stages</small></span>
+      <span class="num stat bldgs">${result.buildings} <small class="unit">bldgs</small></span>
+      <span class="num stat power">${fmt(result.power)} <small class="unit">MW</small></span>
       <span class="chips">${rawChips(cat, result)}</span>
     </button>
   </div>
@@ -101,7 +119,7 @@ function renderStages(cat: Catalog, result: Result): string {
       <td>${icon(e.item, "sm")}${esc(itemName(cat, e.item))}${e.purity ? ` (${e.purity})` : ""}</td>
       <td></td>
       <td class="num">${flows(cat, [[e.item, e.perMin]])}</td>
-      <td class="num">${fmt(e.clock)}%</td>
+      <td class="num">${clock(e.clock)}</td>
       <td class="num">${fmt(e.power)}</td></tr>`);
   }
   for (const s of result.stages) {
@@ -112,7 +130,7 @@ function renderStages(cat: Catalog, result: Result): string {
       <td>${recipeLabel(s.recipe)}${s.kind === "dispose" ? " <small>disposal</small>" : ""}</td>
       <td class="num">${flows(cat, s.ins)}</td>
       <td class="num">${flows(cat, s.outs)}</td>
-      <td class="num">${fmt(s.clock)}%</td>
+      <td class="num">${clock(s.clock)}</td>
       <td class="num">${fmt(s.power)}</td></tr>`);
   }
   return `<div class="scroll"><table>
@@ -143,6 +161,7 @@ function renderDetail(cat: Catalog, row: RowModel): string {
   const sinks = result.sinks
     .map(([item, n]) => `${fmt(n)}/min ${esc(itemName(cat, item))}`)
     .join(", ");
+  const base = row.selected.result;
   const alternatives = row.ranked
     .map((r, index) => {
       const names = r.result.stages
@@ -150,11 +169,13 @@ function renderDetail(cat: Catalog, row: RowModel): string {
         .map((s) => esc(s.recipe.name))
         .join(" · ");
       const isSelected = r === row.selected;
+      const d = (diff: number, format?: (n: number) => string) =>
+        isSelected ? "" : delta(diff, format);
       const raws = r.result.extractors.map((e) => esc(itemName(cat, e.item))).join(", ");
       return `<button type="button" class="alt${isSelected ? " selected" : ""}" data-pick="${id}" data-index="${index}" data-fk="pick:${id}:${index}" aria-pressed="${isSelected}">
-        <span class="num">${r.result.stageCount}<span class="sr"> stages</span></span>
-        <span class="num">${r.result.buildings}<span class="sr"> buildings</span></span>
-        <span class="num">${fmt(r.result.power)} MW</span>
+        <span class="num">${r.result.stageCount}<span class="sr"> stages</span>${d(r.result.stageCount - base.stageCount)}</span>
+        <span class="num">${r.result.buildings}<span class="sr"> buildings</span>${d(r.result.buildings - base.buildings)}</span>
+        <span class="num">${fmt(r.result.power)} MW${d(r.result.power - base.power, fmt)}</span>
         <span class="alt-raw">${raws}${r.result.unresolved.length ? ' · <span class="warn">stuck byproduct</span>' : ""}</span>
         <span class="alt-names">${index === 0 ? '<span class="tag">best</span> ' : ""}${names}</span>
       </button>`;
@@ -193,10 +214,14 @@ export function renderList(
     const t = totals.get(group.id)!;
     const id = esc(group.id);
     const open = !collapsed.has(group.id);
+    const pct = t.total ? (t.built / t.total) * 100 : 0;
     out.push(
-      `<section class="group"><h2><button type="button" class="fold-head" data-fold="${id}" data-fk="fold:${id}" aria-expanded="${open}"><span>${esc(group.name)}</span> <span class="num">${t.built}/${t.total}</span></button></h2>`,
+      `<section class="group"><h2><button type="button" class="fold-head" data-fold="${id}" data-fk="fold:${id}" aria-expanded="${open}"><span>${esc(group.name)}</span> <span class="gauge" aria-hidden="true"><span style="width:${pct}%"></span></span><span class="num">${t.built}/${t.total}</span></button></h2>`,
     );
-    if (open) for (const row of inGroup) out.push(renderRow(cat, row, row.id === openId));
+    if (open) {
+      out.push(LIST_HEAD);
+      for (const row of inGroup) out.push(renderRow(cat, row, row.id === openId));
+    }
     out.push("</section>");
   }
   return out.join("");

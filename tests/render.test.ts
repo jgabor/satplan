@@ -45,3 +45,20 @@ describe("rate controls", () => {
     expect(html(row(false, cat.ref.IronPlate * 2))).not.toMatch(/data-step="-1"[^>]*disabled/);
   });
 });
+
+describe("chain list", () => {
+  it("adds a column header row only to open tiers", () => {
+    const r = row(false);
+    expect(html(r)).toContain('class="list-head"');
+    expect(renderList(cat, [r], totals, null, new Set([r.group]))).not.toContain("list-head");
+  });
+
+  it("shows deltas against the selected chain on the other chains only", () => {
+    const r = row(false);
+    expect(r.ranked.length).toBeGreaterThan(1);
+    const out = html(r);
+    const selected = out.match(/<button[^>]*class="alt selected"[\s\S]*?<\/button>/)![0];
+    expect(selected).not.toContain("delta");
+    expect(out.match(/class="delta /g)!.length).toBe((r.ranked.length - 1) * 3);
+  });
+});

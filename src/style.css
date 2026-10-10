@@ -17,6 +17,7 @@
   --accent: #fa9549;
   --accent-ink: #1a1a1a;
   --warn: #e0766b;
+  --good: #7fc28a;
   --display: "Roboto Condensed", "Bahnschrift", "Arial Narrow", system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -397,6 +398,31 @@ footer {
   letter-spacing: 0.04em;
 }
 
+/* Keep opened rows below the measured sticky header. */
+.item,
+.item > .row {
+  scroll-margin-top: calc(var(--top-h, 0px) + 8px);
+}
+
+.changed {
+  animation: changed 700ms ease-out;
+}
+
+@keyframes changed {
+  from {
+    background-color: #fa954955;
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .changed {
+    animation: none;
+  }
+}
+
 .item {
   border-top: 1px solid var(--line);
 }
@@ -683,6 +709,17 @@ td .by {
   color: var(--muted);
 }
 
+th:nth-child(1),
+th:nth-child(2),
+th:nth-child(7),
+th:nth-child(8),
+td:nth-child(1),
+td:nth-child(2),
+td:nth-child(7),
+td:nth-child(8) {
+  text-align: right;
+}
+
 td.num {
   font-size: 12px;
   white-space: nowrap;
@@ -698,6 +735,7 @@ td.num:nth-child(6) {
   display: block;
   width: 44px;
   height: 3px;
+  margin-left: auto;
   margin-top: 3px;
   background: var(--panel-2);
 }
@@ -732,6 +770,13 @@ h3 {
 
 h3 small {
   letter-spacing: 0.04em;
+}
+
+.pick-summary {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .alts {
@@ -776,7 +821,7 @@ h3 small {
 }
 
 .alt-raw {
-  color: var(--muted);
+  color: var(--text);
 }
 
 /* Difference from the selected chain. Lower is better in every column. */
@@ -789,7 +834,7 @@ h3 small {
 }
 
 .delta.better {
-  color: var(--text);
+  color: var(--good);
 }
 
 .empty {
@@ -970,6 +1015,90 @@ footer a {
 
   .chip {
     white-space: normal;
+  }
+
+  /* Stage cards keep flows side by side on phones. */
+  .scroll {
+    overflow-x: visible;
+  }
+  table {
+    min-width: 0;
+  }
+  thead {
+    display: none;
+  }
+  tbody {
+    display: grid;
+    gap: 8px;
+  }
+  tbody tr {
+    display: grid;
+    grid-template-columns: auto auto auto minmax(0, 1fr);
+    padding: 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+  }
+  tbody td {
+    border: 0;
+    padding: 1px 4px;
+    font-size: 12px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  tbody td .ico-sm {
+    width: 12px;
+    height: 12px;
+  }
+  tbody td:nth-child(5),
+  tbody td:nth-child(6) {
+    font-size: 11px;
+  }
+  tbody td:nth-child(n + 5) {
+    grid-column: 1 / -1;
+    width: 50%;
+    min-width: 0;
+  }
+  tbody td:nth-child(5),
+  tbody td:nth-child(6) {
+    grid-row: 2;
+  }
+  tbody td:nth-child(7),
+  tbody td:nth-child(8) {
+    grid-row: 3;
+  }
+  tbody td:nth-child(7) {
+    text-align: left;
+  }
+  tbody td:nth-child(7) .clock-bar {
+    margin-left: 0;
+  }
+  tbody td:nth-child(6),
+  tbody td:nth-child(8) {
+    justify-self: end;
+  }
+  tbody td:nth-child(5):empty {
+    display: none;
+  }
+  tbody td:nth-child(5):empty + td {
+    width: 100%;
+  }
+  tbody td:nth-child(5)::before,
+  tbody td:nth-child(6)::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font: 10px/1.2 var(--display);
+  }
+  tbody td:nth-child(7)::before,
+  tbody td:nth-child(8)::before {
+    content: attr(data-label) ": ";
+    color: var(--muted);
+    font: 11px var(--display);
+  }
+  tbody td:nth-child(1)::after,
+  tbody td:nth-child(3)::after {
+    content: " ·";
+    color: var(--muted);
   }
 }
 

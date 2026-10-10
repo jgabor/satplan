@@ -3,7 +3,7 @@ import { METRICS, rankChains, recipeTiers, stepRate, wholeBuildings, type Metric
 import { catalog as cat } from "./catalog.ts";
 import { esc, finalBase, renderList, type RowModel } from "./render.ts";
 import { readState, saveState, type State } from "./state.ts";
-import type { Extraction } from "./types.ts";
+import type { Extraction, Result } from "./types.ts";
 
 const listedSet = new Set(cat.listed);
 
@@ -18,6 +18,8 @@ const todoEl = $<HTMLInputElement>("#todo");
 const countEl = $<HTMLElement>("#count");
 const barEl = $<HTMLElement>("#bar");
 const statusEl = $<HTMLElement>("#status");
+const pickStatusEl = $<HTMLElement>("#pick-status");
+let announcementFrame = 0;
 const foldEl = $<HTMLButtonElement>("#fold");
 const optionsEl = $<HTMLButtonElement>("#options");
 const topEl = $<HTMLElement>(".top");
@@ -31,6 +33,40 @@ const collapsed = new Set<string>();
 const exactMode = new Map<string, boolean>();
 // A null entry means no chain is unlocked at the chosen tier.
 const cache = new Map<string, RowModel | null>();
+
+let anchor: { key: string; top: number } | null = null;
+const openSession = `satplan:${Date.now()}`;
+
+function captureAnchor(target: HTMLElement) {
+  const element = target.closest<HTMLElement>("[data-fk]");
+  anchor = element?.dataset.fk
+    ? { key: element.dataset.fk, top: element.getBoundingClientRect().top }
+    : null;
+  const captured = anchor;
+  queueMicrotask(() => {
+    if (anchor === captured) anchor = null;
+  });
+}
+
+function updateTopHeight() {
+  const height =
+    getComputedStyle(topEl).position === "sticky" ? topEl.getBoundingClientRect().height : 0;
+  document.documentElement.style.setProperty("--top-h", `${height}px`);
+}
+new ResizeObserver(updateTopHeight).observe(topEl);
+window.addEventListener("resize", updateTopHeight);
+
+function scrollOpen(block: ScrollLogicalPosition = "nearest") {
+  updateTopHeight();
+  const item = document.getElementById(`item-${openId}`);
+  const row = item?.querySelector<HTMLElement>(".row");
+  if (!item || !row) return;
+  if (block === "start" || row.getBoundingClientRect().top > window.innerHeight / 2) {
+    item.scrollIntoView({ block: "start" });
+  } else {
+    row.scrollIntoView({ block });
+  }
+}
 
 const chainKey = (ids: string[]) => [...ids].sort().join("|");
 
@@ -82,10 +118,16 @@ function haystack(row: RowModel): string {
   return parts.join(" ").toLowerCase();
 }
 
-function render() {
+function render(highlight = false, pick?: { id: string; previous: Result }) {
+  cancelAnimationFrame(announcementFrame);
+  pickStatusEl.textContent = "";
+  const previousOpen = listEl.querySelector<HTMLElement>(".item.open")?.dataset.item;
+  const values = new Map<string, string>();
+  for (const el of document.querySelectorAll<HTMLElement>("[data-k]"))
+    values.set(el.dataset.k!, el.textContent ?? "");
   const all = cat.listed.map(rowFor).filter((r): r is RowModel => r !== null);
   const builtTotal = all.filter((r) => r.built).length;
-  countEl.innerHTML = `<b>${builtTotal}</b> / ${all.length} built`;
+  countEl.innerHTML = `<b data-k="built-count">${builtTotal}</b> / ${all.length} built`;
   barEl.style.width = `${(builtTotal / all.length) * 100}%`;
 
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -107,7 +149,38 @@ function render() {
   foldEl.textContent = collapsed.size < cat.groups.length ? "Collapse all" : "Expand all";
 
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset.fk;
-  listEl.innerHTML = renderList(cat, rows, totals, openId, searching ? new Set() : collapsed);
+  listEl.innerHTML = renderList(
+    cat,
+    rows.map((r) => ({ ...r, pickSummary: pick?.id === r.id ? pick.previous : undefined })),
+    totals,
+    openId,
+    searching ? new Set() : collapsed,
+  );
+  if (pick) {
+    const summary = listEl.querySelector(".pick-summary")?.textContent ?? "";
+    announcementFrame = requestAnimationFrame(() => {
+      pickStatusEl.textContent = summary;
+    });
+  }
+  if (highlight) {
+    for (const el of document.querySelectorAll<HTMLElement>("[data-k]")) {
+      const stageRow = el.closest<HTMLElement>("tr[data-k]");
+      if (el !== stageRow && stageRow && !values.has(stageRow.dataset.k!)) continue;
+      const old = values.get(el.dataset.k!);
+      const item = el.closest<HTMLElement>(".item");
+      const stillOpen = item?.dataset.item === previousOpen && item?.classList.contains("open");
+      // Existing values change in place; new detail values only flash within an already open item.
+      if ((old !== undefined && old !== el.textContent) || (old === undefined && stillOpen)) {
+        // A stage row flashes as a whole only when it is new.
+        if (el.tagName !== "TR" || old === undefined) el.classList.add("changed");
+      }
+    }
+  }
+  if (anchor) {
+    const el = listEl.querySelector<HTMLElement>(`[data-fk="${CSS.escape(anchor.key)}"]`);
+    if (el) window.scrollBy(0, el.getBoundingClientRect().top - anchor.top);
+    anchor = null;
+  }
   if (focusKey && listEl.contains(document.activeElement) === false) {
     listEl.querySelector<HTMLElement>(`[data-fk="${CSS.escape(focusKey)}"]`)?.focus({
       preventScroll: true,
@@ -115,11 +188,11 @@ function render() {
   }
 }
 
-function commit(changed?: string) {
+function commit(changed?: string, pick?: { id: string; previous: Result }, highlight = true) {
   if (changed) cache.delete(changed);
   else cache.clear();
   void saveState(state);
-  render();
+  render(highlight, pick);
 }
 
 function setRate(id: string, value: number) {
@@ -129,18 +202,49 @@ function setRate(id: string, value: number) {
 }
 
 function setOpen(id: string | null) {
+  const wasOpen = openId !== null;
   openId = id;
-  history.replaceState(
-    null,
-    "",
-    id ? `#${encodeURIComponent(id)}` : location.pathname + location.search,
-  );
+  if (id) {
+    const url = `#${encodeURIComponent(id)}`;
+    if (!wasOpen) history.pushState({ ...history.state, satplanOpen: openSession }, "", url);
+    else history.replaceState(history.state, "", url);
+  } else if (wasOpen && history.state?.satplanOpen === openSession) {
+    history.back();
+  } else {
+    history.replaceState(history.state, "", location.pathname + location.search);
+  }
   render();
-  if (id) document.getElementById(`item-${id}`)?.scrollIntoView({ block: "nearest" });
+  if (id) scrollOpen();
 }
+
+function hashItem(): string | null {
+  try {
+    const id = decodeURIComponent(location.hash.slice(1));
+    return listedSet.has(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function navigate(event: Event) {
+  const id = hashItem();
+  // A traversal can send both popstate and hashchange for the same item.
+  if (id === openId) {
+    if (event.type === "popstate") void saveState(state);
+    return;
+  }
+  openId = id;
+  if (id) collapsed.delete(cat.items[id].group!);
+  render();
+  if (id) scrollOpen("start");
+  void saveState(state);
+}
+window.addEventListener("popstate", navigate);
+window.addEventListener("hashchange", navigate);
 
 listEl.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
+  captureAnchor(target);
   const fold = target.closest<HTMLElement>("[data-fold]");
   if (fold) {
     const id = fold.dataset.fold!;
@@ -165,9 +269,10 @@ listEl.addEventListener("click", (event) => {
     const id = pick.dataset.pick!;
     const row = rowFor(id)!;
     const chosen = row.ranked[Number(pick.dataset.index)];
+    if (chosen === row.selected) return;
     if (chosen === row.ranked[0]) delete state.chosen[id];
     else state.chosen[id] = chosen.ids;
-    commit(id);
+    commit(id, { id, previous: row.selected.result });
     return;
   }
   const step = target.closest<HTMLElement>("[data-step]");
@@ -183,7 +288,7 @@ listEl.addEventListener("click", (event) => {
     const id = mode.dataset.id!;
     exactMode.set(id, mode.dataset.mode === "exact");
     cache.delete(id);
-    render();
+    render(true);
     return;
   }
   const reset = target.closest<HTMLElement>("[data-reset-rate]");
@@ -197,6 +302,7 @@ listEl.addEventListener("click", (event) => {
 
 listEl.addEventListener("change", (event) => {
   const target = event.target as HTMLInputElement;
+  captureAnchor(target);
   const id = target.dataset.id;
   if (!id) return;
   if (target.classList.contains("built-box")) {
@@ -239,7 +345,7 @@ minerEl.addEventListener("change", () => {
 
 tierEl.addEventListener("change", () => {
   state.tier = tierEl.value === "" ? null : Number(tierEl.value);
-  commit();
+  commit(undefined, undefined, false);
 });
 
 purityEl.addEventListener("change", () => {
@@ -285,11 +391,11 @@ async function init() {
       `<option value="${m.id}"${m.id === state.metric ? " selected" : ""}>${esc(m.label)}</option>`,
   ).join("");
   $("#source").textContent = cat.meta.sha.slice(0, 7);
-  const hash = decodeURIComponent(location.hash.slice(1));
-  if (listedSet.has(hash)) openId = hash;
+  openId = hashItem();
+  updateTopHeight();
   render();
   document.body.classList.add("ready");
-  if (openId) document.getElementById(`item-${openId}`)?.scrollIntoView({ block: "start" });
+  if (openId) scrollOpen("start");
 }
 
 void init();

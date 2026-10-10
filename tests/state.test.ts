@@ -119,6 +119,21 @@ describe("saved plan", () => {
     expect(store.size).toBe(0);
   });
 
+  it("keeps the current hash and history marker when encoding finishes after navigation", async () => {
+    stubPage("");
+    const marker = { satplanOpen: "session" };
+    const replaceState = vi.fn();
+    vi.stubGlobal("history", { state: marker, replaceState });
+    const saving = saveState({ ...emptyState(), built: ["IronPlate"] });
+    location.hash = "#ModularFrame";
+    await saving;
+    expect(replaceState).toHaveBeenCalledOnce();
+    const [savedMarker, , url] = replaceState.mock.calls[0];
+    expect(savedMarker).toBe(marker);
+    expect(new URL(url).hash).toBe("#ModularFrame");
+    expect(new URL(url).searchParams.has("s")).toBe(true);
+  });
+
   it("still works when storage throws", async () => {
     stubPage("");
     vi.stubGlobal("localStorage", {

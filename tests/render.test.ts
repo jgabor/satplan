@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { rankChains } from "../src/calc.ts";
 import { catalog as cat } from "../src/catalog.ts";
-import { fmtMW, renderList, type RowModel } from "../src/render.ts";
+import { esc, fmtMW, listStatus, renderList, type RowModel } from "../src/render.ts";
 
 function row(exact: boolean, rate = cat.ref.IronPlate): RowModel {
   const ranked = rankChains(cat, "IronPlate", rate, 0);
@@ -140,5 +140,69 @@ describe("display polish", () => {
     expect(out).toContain('data-label="Out /min"');
     const alternatives = out.slice(out.indexOf('<div class="alts">'));
     expect(alternatives).not.toContain("data-k");
+  });
+});
+
+describe("pick recipe feedback", () => {
+  it("names replaced and added make recipes and tags new recipe stages", () => {
+    const r = row(false);
+    const previous = r.ranked[10].result;
+    r.pickSummary = previous;
+    const now = r.selected.result;
+    const oldIds = new Set(previous.stages.map((s) => s.recipe.id));
+    const newIds = new Set(now.stages.map((s) => s.recipe.id));
+    const removed = previous.stages
+      .filter((s) => s.kind === "make" && !newIds.has(s.recipe.id))
+      .map((s) => s.recipe.name);
+    const added = now.stages
+      .filter((s) => s.kind === "make" && !oldIds.has(s.recipe.id))
+      .map((s) => s.recipe.name);
+    expect(removed.length).toBeGreaterThan(0);
+    expect(added.length).toBeGreaterThan(0);
+    expect(html(r)).toContain(esc(`Replaced ${removed.join(", ")} with ${added.join(", ")}`));
+    const newStages = now.stages.filter((s) => s.kind === "make" && !oldIds.has(s.recipe.id));
+    expect(html(r).match(/class="tag new"/g)?.length).toBe(newStages.length);
+    for (const stage of newStages) {
+      expect(html(r)).toContain(
+        `${esc(stage.recipe.name)}${stage.recipe.alt ? ' <span class="tag">alt</span>' : ""} <span class="tag new">new</span>`,
+      );
+    }
+    delete r.pickSummary;
+    expect(html(r)).not.toContain('class="tag new"');
+    expect(html(r)).not.toContain('class="pick-summary"');
+  });
+
+  it("omits recipe changes and tags when only the rates differ", () => {
+    const r = row(false);
+    r.pickSummary = { ...r.selected.result, power: r.selected.result.power + 1 };
+    const out = html(r);
+    expect(out).not.toContain("Replaced ");
+    expect(out).not.toContain("Added ");
+    expect(out).not.toContain("Removed ");
+    expect(out).not.toContain('class="tag new"');
+  });
+
+  it("names additions or removals without an empty replacement phrase", () => {
+    const r = row(false);
+    const previous = r.selected.result;
+    r.pickSummary = { ...previous, stages: [] };
+    expect(html(r)).toContain("<br> Added ");
+    r.pickSummary = previous;
+    r.selected.result = { ...previous, stages: previous.stages.filter((s) => s.item === r.id) };
+    expect(html(r)).toContain("<br> Removed ");
+  });
+});
+
+describe("list status", () => {
+  it("counts tier-hidden items against the full list", () => {
+    expect(listStatus(84, 84, 88, 3)).toBe("84 of 88 chains · 4 not unlocked by tier 3");
+    expect(listStatus(7, 84, 88, 3)).toBe("7 of 88 chains · 4 not unlocked by tier 3");
+  });
+
+  it("reports chain changes only when requested", () => {
+    expect(listStatus(88, 88, 88, null, 2)).toBe("88 of 88 chains · chain changed for 2 items");
+    expect(listStatus(88, 88, 88, null, 1)).toBe("88 of 88 chains · chain changed for 1 item");
+    expect(listStatus(88, 88, 88, null)).toBe("88 of 88 chains");
+    expect(listStatus(88, 88, 88, 9)).toBe("88 of 88 chains");
   });
 });

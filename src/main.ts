@@ -1,11 +1,12 @@
 import "./style.css";
 import { METRICS, rankChains, recipeTiers, stepRate, wholeBuildings, type Metric } from "./calc.ts";
 import { catalog as cat } from "./catalog.ts";
-import { esc, finalBase, renderList, type RowModel } from "./render.ts";
-import { readState, saveState, type State } from "./state.ts";
+import { esc, finalBase, listStatus, renderList, type RowModel } from "./render.ts";
+import { emptyState, readState, saveState, type State } from "./state.ts";
 import type { Extraction, Result } from "./types.ts";
 
 const listedSet = new Set(cat.listed);
+const defaults = emptyState();
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 const listEl = $<HTMLDivElement>("#list");
@@ -26,8 +27,11 @@ const topEl = $<HTMLElement>(".top");
 
 let state: State;
 let openId: string | null = null;
+let renderedOpenId: string | null = null;
 let query = "";
 let onlyTodo = false;
+// Keep newly checked items in Remaining until the next list filter change.
+const justBuilt = new Set<string>();
 const collapsed = new Set<string>();
 // Item id to the rate control the user picked. Items without an entry follow their saved rate.
 const exactMode = new Map<string, boolean>();
@@ -118,7 +122,7 @@ function haystack(row: RowModel): string {
   return parts.join(" ").toLowerCase();
 }
 
-function render(highlight = false, pick?: { id: string; previous: Result }) {
+function render(highlight = false, pick?: { id: string; previous: Result }, changedChains = 0) {
   cancelAnimationFrame(announcementFrame);
   pickStatusEl.textContent = "";
   const previousOpen = listEl.querySelector<HTMLElement>(".item.open")?.dataset.item;
@@ -132,7 +136,8 @@ function render(highlight = false, pick?: { id: string; previous: Result }) {
 
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const rows = all.filter(
-    (r) => (!onlyTodo || !r.built) && words.every((w) => haystack(r).includes(w)),
+    (r) =>
+      (!onlyTodo || !r.built || justBuilt.has(r.id)) && words.every((w) => haystack(r).includes(w)),
   );
   const totals = new Map<string, { built: number; total: number }>();
   for (const r of all) {
@@ -141,7 +146,25 @@ function render(highlight = false, pick?: { id: string; previous: Result }) {
     if (r.built) t.built++;
     totals.set(r.group, t);
   }
-  statusEl.textContent = `${rows.length} of ${all.length} chains`;
+  statusEl.textContent = listStatus(
+    rows.length,
+    all.length,
+    cat.listed.length,
+    state.tier,
+    changedChains,
+  );
+  const settings = [
+    [metricEl, state.metric !== defaults.metric],
+    [minerEl, state.extraction.miner !== defaults.extraction.miner],
+    [purityEl, state.extraction.purity !== defaults.extraction.purity],
+    [tierEl, state.tier !== defaults.tier],
+  ] as const;
+  for (const [select, changed] of settings) select.classList.toggle("non-default", changed);
+  const changedSettings = settings.filter(([, changed]) => changed).length;
+  // The accessible name starts with the visible text, so voice control can still say "Options".
+  optionsEl.innerHTML = changedSettings
+    ? `Options · ${changedSettings}<span class="sr"> changed</span>`
+    : "Options";
 
   // Matches inside a collapsed tier would be hidden, so a search shows every tier.
   const searching = words.length > 0;
@@ -156,6 +179,10 @@ function render(highlight = false, pick?: { id: string; previous: Result }) {
     openId,
     searching ? new Set() : collapsed,
   );
+  if (openId && openId !== renderedOpenId) {
+    document.getElementById(`item-${openId}`)?.querySelector(".detail")?.classList.add("opening");
+  }
+  renderedOpenId = openId;
   if (pick) {
     const summary = listEl.querySelector(".pick-summary")?.textContent ?? "";
     announcementFrame = requestAnimationFrame(() => {
@@ -188,11 +215,26 @@ function render(highlight = false, pick?: { id: string; previous: Result }) {
   }
 }
 
-function commit(changed?: string, pick?: { id: string; previous: Result }, highlight = true) {
+function commit(changed?: string, pick?: { id: string; previous: Result }) {
   if (changed) cache.delete(changed);
   else cache.clear();
   void saveState(state);
-  render(highlight, pick);
+  render(true, pick);
+}
+
+function changeSettings(update: () => void) {
+  const before = new Map(cat.listed.map((id) => [id, rowFor(id)]));
+  justBuilt.clear();
+  update();
+  cache.clear();
+  let changed = 0;
+  for (const id of cat.listed) {
+    const old = before.get(id);
+    const next = rowFor(id);
+    if (old && next && chainKey(old.selected.ids) !== chainKey(next.selected.ids)) changed++;
+  }
+  void saveState(state);
+  render(true, undefined, changed);
 }
 
 function setRate(id: string, value: number) {
@@ -306,6 +348,8 @@ listEl.addEventListener("change", (event) => {
   const id = target.dataset.id;
   if (!id) return;
   if (target.classList.contains("built-box")) {
+    if (onlyTodo && target.checked) justBuilt.add(id);
+    else justBuilt.delete(id);
     state.built = target.checked ? [...state.built, id] : state.built.filter((b) => b !== id);
     commit(id);
   } else if (target.classList.contains("rate-input")) {
@@ -314,6 +358,7 @@ listEl.addEventListener("change", (event) => {
 });
 
 foldEl.addEventListener("click", () => {
+  justBuilt.clear();
   if (collapsed.size < cat.groups.length) {
     for (const group of cat.groups) collapsed.add(group.id);
     setOpen(null);
@@ -329,31 +374,37 @@ optionsEl.addEventListener("click", () => {
 });
 
 searchEl.addEventListener("input", () => {
+  justBuilt.clear();
   query = searchEl.value;
   render();
 });
 
 metricEl.addEventListener("change", () => {
-  state.metric = Number(metricEl.value) as Metric;
-  commit();
+  changeSettings(() => {
+    state.metric = Number(metricEl.value) as Metric;
+  });
 });
 
 minerEl.addEventListener("change", () => {
-  state.extraction.miner = Number(minerEl.value) as Extraction["miner"];
-  commit();
+  changeSettings(() => {
+    state.extraction.miner = Number(minerEl.value) as Extraction["miner"];
+  });
 });
 
 tierEl.addEventListener("change", () => {
-  state.tier = tierEl.value === "" ? null : Number(tierEl.value);
-  commit(undefined, undefined, false);
+  changeSettings(() => {
+    state.tier = tierEl.value === "" ? null : Number(tierEl.value);
+  });
 });
 
 purityEl.addEventListener("change", () => {
-  state.extraction.purity = purityEl.value as Extraction["purity"];
-  commit();
+  changeSettings(() => {
+    state.extraction.purity = purityEl.value as Extraction["purity"];
+  });
 });
 
 todoEl.addEventListener("change", () => {
+  justBuilt.clear();
   onlyTodo = todoEl.checked;
   render();
 });
@@ -366,6 +417,7 @@ document.addEventListener("keydown", (event) => {
     searchEl.select();
   } else if (event.key === "Escape") {
     if (document.activeElement === searchEl && searchEl.value) {
+      justBuilt.clear();
       searchEl.value = "";
       query = "";
       render();

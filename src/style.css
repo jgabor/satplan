@@ -82,7 +82,8 @@ select {
 input[type="search"]:focus,
 input[type="number"]:focus,
 input[type="text"]:focus,
-select:focus {
+select:focus,
+select.non-default {
   border-color: var(--accent);
 }
 
@@ -579,7 +580,8 @@ footer {
   vertical-align: 1px;
 }
 
-.tag.pin {
+.tag.pin,
+.tag.new {
   color: var(--accent);
   border-color: var(--accent);
 }
@@ -588,6 +590,28 @@ footer {
   padding: 4px 12px 14px 44px;
   background: var(--inset);
   border-top: 1px solid var(--line);
+}
+
+/* Only a newly opened detail gets this class; later renders stay still. */
+.detail.opening {
+  animation: opening 150ms ease-out;
+}
+
+@keyframes opening {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail.opening {
+    animation: none;
+  }
 }
 
 .controls {

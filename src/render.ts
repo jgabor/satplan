@@ -17,6 +17,7 @@ export type RowModel = {
   stale: boolean;
   /** True when the detail view offers the exact rate field instead of building steps. */
   exact: boolean;
+  pickSummary?: Result;
 };
 
 const ESCAPES: Record<string, string> = {
@@ -35,6 +36,8 @@ export function fmt(n: number): string {
   return String(Number(n.toFixed(digits)));
 }
 
+export const fmtMW = (n: number) => n.toFixed(1);
+
 const itemName = (cat: Catalog, id: string) => cat.items[id]?.name ?? cat.raw[id]?.name ?? id;
 const buildingName = (cat: Catalog, id: string) => cat.buildings[id] ?? id;
 
@@ -47,11 +50,15 @@ const clock = (pct: number) =>
   `${fmt(pct)}%<span class="clock-bar${pct < 99.95 ? " under" : ""}" aria-hidden="true"><span style="width:${Math.min(pct, 100)}%"></span></span>`;
 
 /** Signed difference from the selected chain. Lower is better for every column. */
-function delta(diff: number, format: (n: number) => string = String): string {
-  const same = Math.abs(diff) < 0.005;
+function delta(
+  diff: number,
+  format: (n: number) => string = String,
+  comparison: string | null = "selected",
+): string {
+  const same = Math.abs(diff) < 0.005 || format(Math.abs(diff)) === format(0);
   const kind = same ? "same" : diff > 0 ? "worse" : "better";
   const text = same ? "±0" : `${diff > 0 ? "+" : "−"}${format(Math.abs(diff))}`;
-  return ` <span class="delta ${kind}"><span class="sr">, </span>${text}<span class="sr"> compared with the selected chain</span></span>`;
+  return ` <span class="delta ${kind}">${comparison ? '<span class="sr">, </span>' : ""}${text}${comparison ? `<span class="sr"> compared with the ${comparison} chain</span>` : ""}</span>`;
 }
 
 /** Column labels for the rows of an open tier. Wide screens only; see style.css. */
@@ -87,12 +94,12 @@ function renderRow(cat: Catalog, row: RowModel, open: boolean): string {
     <button type="button" class="main" data-toggle="${id}" data-fk="toggle:${id}" aria-expanded="${open}">
       ${icon(row.id, "lg")}
       <span class="name">${esc(row.name)}</span>
-      <span class="recipe">${recipeLabel(finalRecipe(row))}${row.pinned ? ' <span class="tag pin">picked</span>' : ""}</span>
-      <span class="num rate">${fmt(row.rate)}/min</span>
-      <span class="num stat stages">${result.stageCount} <small class="unit">stages</small></span>
-      <span class="num stat bldgs">${result.buildings} <small class="unit">bldgs</small></span>
-      <span class="num stat power">${fmt(result.power)} <small class="unit">MW</small></span>
-      <span class="chips">${rawChips(cat, result)}</span>
+      <span class="recipe" data-k="${id}:row:recipe">${recipeLabel(finalRecipe(row))}${row.pinned ? ' <span class="tag pin">picked</span>' : ""}</span>
+      <span class="num rate" data-k="${id}:row:rate">${fmt(row.rate)}/min</span>
+      <span class="num stat stages" data-k="${id}:row:stages">${result.stageCount} <small class="unit">stages</small></span>
+      <span class="num stat bldgs" data-k="${id}:row:bldgs">${result.buildings} <small class="unit">bldgs</small></span>
+      <span class="num stat power" data-k="${id}:row:power">${fmtMW(result.power)} <small class="unit">MW</small></span>
+      <span class="chips" data-k="${id}:row:chips">${rawChips(cat, result)}</span>
     </button>
   </div>
   ${open ? renderDetail(cat, row) : ""}
@@ -108,34 +115,48 @@ function flows(cat: Catalog, list: [string, number, ("main" | "by")?][]): string
     .join("");
 }
 
-function renderStages(cat: Catalog, result: Result): string {
+function renderStages(cat: Catalog, result: Result, id: string): string {
   let step = 0;
   const rows: string[] = [];
   for (const e of result.extractors) {
-    rows.push(`<tr class="extract">
-      <td class="num">${++step}</td>
-      <td class="num">${e.count}×</td>
-      <td>${esc(buildingName(cat, e.building))}</td>
-      <td>${icon(e.item, "sm")}${esc(itemName(cat, e.item))}${e.purity ? ` (${e.purity})` : ""}</td>
-      <td></td>
-      <td class="num">${flows(cat, [[e.item, e.perMin]])}</td>
-      <td class="num">${clock(e.clock)}</td>
-      <td class="num">${fmt(e.power)}</td></tr>`);
+    const key = `${id}:extract:${esc(e.item)}`;
+    rows.push(`<tr class="extract" data-k="${key}">
+      <td class="num" data-k="${key}:1" data-label="#">${++step}</td>
+      <td class="num" data-k="${key}:2" data-label="Count">${e.count}×</td>
+      <td data-k="${key}:3" data-label="Building">${esc(buildingName(cat, e.building))}</td>
+      <td data-k="${key}:4" data-label="Recipe">${icon(e.item, "sm")}${esc(itemName(cat, e.item))}${e.purity ? ` (${e.purity})` : ""}</td>
+      <td data-k="${key}:5" data-label="In /min"></td>
+      <td class="num" data-k="${key}:6" data-label="Out /min">${flows(cat, [[e.item, e.perMin]])}</td>
+      <td class="num" data-k="${key}:7" data-label="Clock">${clock(e.clock)}</td>
+      <td class="num" data-k="${key}:0" data-label="MW">${fmtMW(e.power)}</td></tr>`);
   }
   for (const s of result.stages) {
-    rows.push(`<tr class="${s.kind}">
-      <td class="num">${++step}</td>
-      <td class="num">${s.count}×</td>
-      <td>${esc(buildingName(cat, s.recipe.building))}</td>
-      <td>${recipeLabel(s.recipe)}${s.kind === "dispose" ? " <small>disposal</small>" : ""}</td>
-      <td class="num">${flows(cat, s.ins)}</td>
-      <td class="num">${flows(cat, s.outs)}</td>
-      <td class="num">${clock(s.clock)}</td>
-      <td class="num">${fmt(s.power)}</td></tr>`);
+    const key = `${id}:stage:${esc(s.recipe.id)}`;
+    rows.push(`<tr class="${s.kind}" data-k="${key}">
+      <td class="num" data-k="${key}:1" data-label="#">${++step}</td>
+      <td class="num" data-k="${key}:2" data-label="Count">${s.count}×</td>
+      <td data-k="${key}:3" data-label="Building">${esc(buildingName(cat, s.recipe.building))}</td>
+      <td data-k="${key}:4" data-label="Recipe">${recipeLabel(s.recipe)}${s.kind === "dispose" ? " <small>disposal</small>" : ""}</td>
+      <td class="num" data-k="${key}:5" data-label="In /min">${flows(cat, s.ins)}</td>
+      <td class="num" data-k="${key}:6" data-label="Out /min">${flows(cat, s.outs)}</td>
+      <td class="num" data-k="${key}:7" data-label="Clock">${clock(s.clock)}</td>
+      <td class="num" data-k="${key}:0" data-label="MW">${fmtMW(s.power)}</td></tr>`);
   }
   return `<div class="scroll"><table>
     <thead><tr><th>#</th><th>Count</th><th>Building</th><th>Recipe</th><th>In /min</th><th>Out /min</th><th>Clock</th><th>MW</th></tr></thead>
     <tbody>${rows.join("")}</tbody></table></div>`;
+}
+
+function renderPickSummary(now: Result, previous: Result): string {
+  const changes = [
+    [now.stageCount - previous.stageCount, "stages", String],
+    [now.buildings - previous.buildings, "bldgs", String],
+    [now.power - previous.power, "MW", fmtMW],
+  ] as const;
+  const parts = changes
+    .filter(([diff, , format]) => Math.abs(diff) >= 0.005 && format(Math.abs(diff)) !== format(0))
+    .map(([diff, label, format]) => `${delta(diff, format, null)} ${label}`);
+  return `<p class="pick-summary">Now ${now.stageCount} stages · ${now.buildings} bldgs · ${fmtMW(now.power)} MW, ${parts.length ? parts.join(", ") + " from the previous chain" : "same as the previous chain"}</p>`;
 }
 
 function renderDetail(cat: Catalog, row: RowModel): string {
@@ -147,7 +168,7 @@ function renderDetail(cat: Catalog, row: RowModel): string {
     ? `<label class="rate-field">Target <input type="number" class="rate-input" data-id="${id}" data-fk="rate:${id}" min="0" step="any" value="${row.rate}" inputmode="decimal"> /min</label>`
     : `<span class="stepper" role="group" aria-label="Final stage buildings">
       <button type="button" class="step" data-step="-1" data-id="${id}" data-fk="step:${id}:-1" aria-label="One fewer ${building}"${stepRate(row.rate, finalBase(row), -1) === null ? " disabled" : ""}>−</button>
-      <span class="step-count num">${fmt(final.count)}× ${building}</span>
+      <span class="step-count num" data-k="${id}:count">${fmt(final.count)}× ${building}${final.clock < 99.95 ? ` · ${fmt(final.clock)}%` : ""}</span>
       <button type="button" class="step" data-step="1" data-id="${id}" data-fk="step:${id}:1" aria-label="One more ${building}">+</button>
     </span>`;
   const rateNote = row.exact
@@ -155,30 +176,43 @@ function renderDetail(cat: Catalog, row: RowModel): string {
     : `${fmt(row.rate)}/min, final stage at ${fmt(final.clock)}%`;
   const modeToggle = `<button type="button" class="link" data-mode="${row.exact ? "steps" : "exact"}" data-id="${id}" data-fk="mode:${id}">${row.exact ? "Building steps" : "Exact rate"}</button>`;
   const totals = result.totals
-    .map(([b, n]) => `<span class="chip total"><b>${n}×</b> ${esc(buildingName(cat, b))}</span>`)
+    .map(
+      ([b, n]) =>
+        `<span class="chip total" data-k="${id}:total:${esc(b)}"><b>${n}×</b> ${esc(buildingName(cat, b))}</span>`,
+    )
     .join("");
-  const power = `<span class="chip total"><b>${fmt(result.power)} MW</b> power</span>`;
+  const power = `<span class="chip total" data-k="${id}:power"><b>${fmtMW(result.power)} MW</b> power</span>`;
   const sinks = result.sinks
     .map(([item, n]) => `${fmt(n)}/min ${esc(itemName(cat, item))}`)
     .join(", ");
   const base = row.selected.result;
+  const sharedRecipes = new Set(base.stages.map((s) => s.recipe.id));
+  const sharedRaw = new Set(base.extractors.map((e) => e.item));
   const alternatives = row.ranked
     .map((r, index) => {
+      const isSelected = r === row.selected;
       const names = r.result.stages
         .filter((s) => s.kind === "make")
-        .map((s) => esc(s.recipe.name))
+        .map(
+          (s) =>
+            `<span${!isSelected && sharedRecipes.has(s.recipe.id) ? ' class="dim"' : ""}>${esc(s.recipe.name)}</span>`,
+        )
         .join(" · ");
-      const isSelected = r === row.selected;
       const d = (diff: number, format?: (n: number) => string) =>
         isSelected ? "" : delta(diff, format);
-      const raws = r.result.extractors.map((e) => esc(itemName(cat, e.item))).join(", ");
+      const raws = r.result.extractors
+        .map(
+          (e) =>
+            `<span${!isSelected && sharedRaw.has(e.item) ? ' class="dim"' : ""}>${esc(itemName(cat, e.item))}</span>`,
+        )
+        .join(", ");
       return `<button type="button" class="alt${isSelected ? " selected" : ""}" data-pick="${id}" data-index="${index}" data-fk="pick:${id}:${index}" aria-pressed="${isSelected}">
         <span class="num">${r.result.stageCount}<span class="sr"> stages</span>${d(r.result.stageCount - base.stageCount)}</span>
         <span class="num">${r.result.buildings}<span class="sr"> buildings</span>${d(r.result.buildings - base.buildings)}</span>
-        <span class="num">${fmt(r.result.power)} MW${d(r.result.power - base.power, fmt)}</span>
+        <span class="num">${fmtMW(r.result.power)} MW${d(r.result.power - base.power, fmtMW)}</span>
         <span class="alt-raw">${raws}${r.result.unresolved.length ? ' · <span class="warn">stuck byproduct</span>' : ""}</span>
         <span class="alt-names">${index === 0 ? '<span class="tag">best</span> ' : ""}${names}</span>
-      </button>`;
+      </button>${isSelected && row.pickSummary ? renderPickSummary(base, row.pickSummary) : ""}`;
     })
     .join("");
   return `
@@ -187,10 +221,10 @@ function renderDetail(cat: Catalog, row: RowModel): string {
     ${rateControl}
     ${modeToggle}
     ${row.customRate ? `<button type="button" class="link" data-reset-rate="${id}" data-fk="reset:${id}">Reset to ${fmt(row.defaultRate)}/min</button>` : `<span class="note dim">Default: one building at 100%</span>`}
-    <span class="note rate-note">${rateNote}</span>
+    <span class="note rate-note" data-k="${id}:note">${rateNote}</span>
   </div>
   <div class="totals">${totals}${power}</div>
-  ${renderStages(cat, result)}
+  ${renderStages(cat, result, id)}
   ${sinks ? `<p class="sink">Send to an AWESOME Sink: ${sinks}</p>` : ""}
   ${row.stale ? '<p class="warn">Your saved chain is no longer available. Showing the best chain.</p>' : ""}
   <h3>Chains <small>${row.ranked.length}, best first</small></h3>

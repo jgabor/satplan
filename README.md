@@ -2,7 +2,7 @@
 
 A small static site that lists self-contained Satisfactory production chains, one per storable part, with building counts and flow rates. It defaults to pure nodes and Mk.2 miners, with free raw extraction and all alternate recipes unlocked.
 
-All state lives in the URL (`?s=…`): built items, ranking metric, miner level, node purity, unlocked tier, custom rates and chosen chains. `#ItemId` opens one item.
+All state lives in the URL (`?s=…`): built items, ranking metric, miner level, node purity, unlocked tier, custom rates and chosen chains. `#ItemId` opens one item; Back closes it.
 
 The same state is also saved to `localStorage` (`satplan:state`) on every change. A link with `?s=` always wins, so a shared link shows the sender's plan. Without one (for example a browser that opens the bare address), the saved plan is restored. Changing anything in a shared link overwrites the saved plan. Which tiers are collapsed and whether the phone options panel is open are not saved.
 

@@ -157,7 +157,9 @@ export function saveState(state: State): Promise<void> {
   const ticket = ++pending;
   return buildUrl(state).then((url) => {
     if (ticket !== pending) return;
-    history.replaceState(null, "", url);
+    const current = new URL(url);
+    current.hash = location.hash;
+    history.replaceState(history.state, "", current.toString());
     const text = new URL(url).searchParams.get(PARAM);
     try {
       if (text) storage()?.setItem(STORAGE_KEY, text);

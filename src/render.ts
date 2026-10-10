@@ -115,7 +115,10 @@ function flows(cat: Catalog, list: [string, number, ("main" | "by")?][]): string
     .join("");
 }
 
-function renderStages(cat: Catalog, result: Result, id: string): string {
+function renderStages(cat: Catalog, result: Result, id: string, previous?: Result): string {
+  // The recipe cell has no data-k: its text is fixed by the row key, and the transient "new" tag
+  // must not count as a change when it goes away.
+  const previousRecipes = previous ? new Set(previous.stages.map((s) => s.recipe.id)) : null;
   let step = 0;
   const rows: string[] = [];
   for (const e of result.extractors) {
@@ -136,7 +139,7 @@ function renderStages(cat: Catalog, result: Result, id: string): string {
       <td class="num" data-k="${key}:1" data-label="#">${++step}</td>
       <td class="num" data-k="${key}:2" data-label="Count">${s.count}×</td>
       <td data-k="${key}:3" data-label="Building">${esc(buildingName(cat, s.recipe.building))}</td>
-      <td data-k="${key}:4" data-label="Recipe">${recipeLabel(s.recipe)}${s.kind === "dispose" ? " <small>disposal</small>" : ""}</td>
+      <td data-label="Recipe">${recipeLabel(s.recipe)}${previousRecipes && s.kind === "make" && !previousRecipes.has(s.recipe.id) ? ' <span class="tag new">new</span>' : ""}${s.kind === "dispose" ? " <small>disposal</small>" : ""}</td>
       <td class="num" data-k="${key}:5" data-label="In /min">${flows(cat, s.ins)}</td>
       <td class="num" data-k="${key}:6" data-label="Out /min">${flows(cat, s.outs)}</td>
       <td class="num" data-k="${key}:7" data-label="Clock">${clock(s.clock)}</td>
@@ -156,7 +159,27 @@ function renderPickSummary(now: Result, previous: Result): string {
   const parts = changes
     .filter(([diff, , format]) => Math.abs(diff) >= 0.005 && format(Math.abs(diff)) !== format(0))
     .map(([diff, label, format]) => `${delta(diff, format, null)} ${label}`);
-  return `<p class="pick-summary">Now ${now.stageCount} stages · ${now.buildings} bldgs · ${fmtMW(now.power)} MW, ${parts.length ? parts.join(", ") + " from the previous chain" : "same as the previous chain"}</p>`;
+  const oldRecipes = previous.stages.filter((s) => s.kind === "make").map((s) => s.recipe);
+  const newRecipes = now.stages.filter((s) => s.kind === "make").map((s) => s.recipe);
+  const oldIds = new Set(oldRecipes.map((r) => r.id));
+  const newIds = new Set(newRecipes.map((r) => r.id));
+  const removed = oldRecipes
+    .filter((r) => !newIds.has(r.id))
+    .map((r) => r.name)
+    .join(", ");
+  const added = newRecipes
+    .filter((r) => !oldIds.has(r.id))
+    .map((r) => r.name)
+    .join(", ");
+  const recipes =
+    removed && added
+      ? `Replaced ${removed} with ${added}`
+      : removed
+        ? `Removed ${removed}`
+        : added
+          ? `Added ${added}`
+          : "";
+  return `<p class="pick-summary">Now ${now.stageCount} stages · ${now.buildings} bldgs · ${fmtMW(now.power)} MW, ${parts.length ? parts.join(", ") + " from the previous chain" : "same as the previous chain"}.${recipes ? `<br> ${esc(recipes)}.` : ""}</p>`;
 }
 
 function renderDetail(cat: Catalog, row: RowModel): string {
@@ -224,13 +247,28 @@ function renderDetail(cat: Catalog, row: RowModel): string {
     <span class="note rate-note" data-k="${id}:note">${rateNote}</span>
   </div>
   <div class="totals">${totals}${power}</div>
-  ${renderStages(cat, result, id)}
+  ${renderStages(cat, result, id, row.pickSummary)}
   ${sinks ? `<p class="sink">Send to an AWESOME Sink: ${sinks}</p>` : ""}
   ${row.stale ? '<p class="warn">Your saved chain is no longer available. Showing the best chain.</p>' : ""}
   <h3>Chains <small>${row.ranked.length}, best first</small></h3>
   <div class="alts-head" aria-hidden="true"><span>Stages</span><span>Buildings</span><span>Power draw</span></div>
   <div class="alts">${alternatives}</div>
 </div>`;
+}
+
+/** Visible chains and the items excluded by the unlocked tier. */
+export function listStatus(
+  shown: number,
+  unlocked: number,
+  total: number,
+  tier: number | null,
+  changed = 0,
+): string {
+  let text = `${shown} of ${total} chains`;
+  if (tier !== null && unlocked < total)
+    text += ` · ${total - unlocked} not unlocked by tier ${tier}`;
+  if (changed) text += ` · chain changed for ${changed} ${changed === 1 ? "item" : "items"}`;
+  return text;
 }
 
 export function renderList(
